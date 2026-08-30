@@ -16,9 +16,17 @@ type BlogPost {
   language: String
   parentId: ID
   parent: BlogPost
-  attachedTexts: [ReaderText!]
+  attachedTexts: [AttachedText!]
   createdAt: DateTime
   updatedAt: DateTime
+}
+
+type AttachedText {
+  id: String!
+  title: String!
+  language: String!
+  level: String!
+  status: String!
 }
 
 input BlogPostInput {
@@ -61,9 +69,17 @@ type Entry {
   sourceUrl: String
 }
 
+type RelatedTopic {
+  title: String!
+  pageUrl: String!
+  extract: String
+}
+
 type WikiQueries {
   wikipediaSummary(title: String!): Summary
   wiktionaryEntry(word: String!): Entry
+  wikipediaRelatedTopics(title: String!): [RelatedTopic!]!
+  wikipediaSearch(query: String!): [Summary!]!
 }
 
 input IngestBlogInput {

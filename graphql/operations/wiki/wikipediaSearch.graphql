@@ -1,0 +1,10 @@
+query wikipediaSearch($query: String!) {
+  wikiQueries {
+    wikipediaSearch(query: $query) {
+      title
+      extract
+      pageUrl
+      thumbnailUrl
+    }
+  }
+}

@@ -1,11 +1,29 @@
 import "dotenv/config";
 
 export type LearnerConfig = {
+  /**
+   * GraphQL endpoint.
+   */
   graphqlEndpoint: string;
+  /**
+   * Sun client id.
+   */
   clientId: string;
+  /**
+   * Sun client secret.
+   */
   clientSecret: string;
+  /**
+   * OpenAI API key for Muse Spark.
+   */
   openaiApiKey: string;
+  /**
+   * OpenAI base URL.
+   */
   openaiBaseUrl: string;
+  /**
+   * Model name.
+   */
   model: string;
 };
 

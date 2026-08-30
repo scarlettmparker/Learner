@@ -27,6 +27,8 @@ type Documents = {
     "query me {\n  gaiaQueries {\n    me {\n      id\n      username\n      personId\n      status\n      createdAt\n      updatedAt\n    }\n  }\n}": typeof types.MeDocument,
     "query hadesTexts($pagination: PaginationInput) {\n  hadesQueries {\n    texts(pagination: $pagination) {\n      items {\n        id\n        title\n        language\n        level\n      }\n      pageInfo {\n        page\n        size\n        totalPages\n        totalCount\n        hasNextPage\n        hasPreviousPage\n      }\n    }\n  }\n}": typeof types.HadesTextsDocument,
     "query locateReaderTexts($ids: [ID!]!) {\n  hadesQueries {\n    locateReaderTexts(ids: $ids) {\n      id\n      title\n      language\n      level\n      status\n    }\n  }\n}": typeof types.LocateReaderTextsDocument,
+    "query wikipediaRelatedTopics($title: String!) {\n  wikiQueries {\n    wikipediaRelatedTopics(title: $title) {\n      title\n      pageUrl\n      extract\n    }\n  }\n}": typeof types.WikipediaRelatedTopicsDocument,
+    "query wikipediaSearch($query: String!) {\n  wikiQueries {\n    wikipediaSearch(query: $query) {\n      title\n      extract\n      pageUrl\n      thumbnailUrl\n    }\n  }\n}": typeof types.WikipediaSearchDocument,
     "query wikipediaSummary($title: String!) {\n  wikiQueries {\n    wikipediaSummary(title: $title) {\n      title\n      extract\n      pageUrl\n      thumbnailUrl\n    }\n  }\n}": typeof types.WikipediaSummaryDocument,
     "query wiktionaryEntry($word: String!) {\n  wikiQueries {\n    wiktionaryEntry(word: $word) {\n      word\n      definitions\n      sourceUrl\n    }\n  }\n}": typeof types.WiktionaryEntryDocument,
 };
@@ -44,6 +46,8 @@ const documents: Documents = {
     "query me {\n  gaiaQueries {\n    me {\n      id\n      username\n      personId\n      status\n      createdAt\n      updatedAt\n    }\n  }\n}": types.MeDocument,
     "query hadesTexts($pagination: PaginationInput) {\n  hadesQueries {\n    texts(pagination: $pagination) {\n      items {\n        id\n        title\n        language\n        level\n      }\n      pageInfo {\n        page\n        size\n        totalPages\n        totalCount\n        hasNextPage\n        hasPreviousPage\n      }\n    }\n  }\n}": types.HadesTextsDocument,
     "query locateReaderTexts($ids: [ID!]!) {\n  hadesQueries {\n    locateReaderTexts(ids: $ids) {\n      id\n      title\n      language\n      level\n      status\n    }\n  }\n}": types.LocateReaderTextsDocument,
+    "query wikipediaRelatedTopics($title: String!) {\n  wikiQueries {\n    wikipediaRelatedTopics(title: $title) {\n      title\n      pageUrl\n      extract\n    }\n  }\n}": types.WikipediaRelatedTopicsDocument,
+    "query wikipediaSearch($query: String!) {\n  wikiQueries {\n    wikipediaSearch(query: $query) {\n      title\n      extract\n      pageUrl\n      thumbnailUrl\n    }\n  }\n}": types.WikipediaSearchDocument,
     "query wikipediaSummary($title: String!) {\n  wikiQueries {\n    wikipediaSummary(title: $title) {\n      title\n      extract\n      pageUrl\n      thumbnailUrl\n    }\n  }\n}": types.WikipediaSummaryDocument,
     "query wiktionaryEntry($word: String!) {\n  wikiQueries {\n    wiktionaryEntry(word: $word) {\n      word\n      definitions\n      sourceUrl\n    }\n  }\n}": types.WiktionaryEntryDocument,
 };
@@ -114,6 +118,14 @@ export function graphql(source: "query hadesTexts($pagination: PaginationInput) 
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "query locateReaderTexts($ids: [ID!]!) {\n  hadesQueries {\n    locateReaderTexts(ids: $ids) {\n      id\n      title\n      language\n      level\n      status\n    }\n  }\n}"): (typeof documents)["query locateReaderTexts($ids: [ID!]!) {\n  hadesQueries {\n    locateReaderTexts(ids: $ids) {\n      id\n      title\n      language\n      level\n      status\n    }\n  }\n}"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "query wikipediaRelatedTopics($title: String!) {\n  wikiQueries {\n    wikipediaRelatedTopics(title: $title) {\n      title\n      pageUrl\n      extract\n    }\n  }\n}"): (typeof documents)["query wikipediaRelatedTopics($title: String!) {\n  wikiQueries {\n    wikipediaRelatedTopics(title: $title) {\n      title\n      pageUrl\n      extract\n    }\n  }\n}"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "query wikipediaSearch($query: String!) {\n  wikiQueries {\n    wikipediaSearch(query: $query) {\n      title\n      extract\n      pageUrl\n      thumbnailUrl\n    }\n  }\n}"): (typeof documents)["query wikipediaSearch($query: String!) {\n  wikiQueries {\n    wikipediaSearch(query: $query) {\n      title\n      extract\n      pageUrl\n      thumbnailUrl\n    }\n  }\n}"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

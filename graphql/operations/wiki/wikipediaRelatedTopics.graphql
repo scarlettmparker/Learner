@@ -1,0 +1,9 @@
+query wikipediaRelatedTopics($title: String!) {
+  wikiQueries {
+    wikipediaRelatedTopics(title: $title) {
+      title
+      pageUrl
+      extract
+    }
+  }
+}

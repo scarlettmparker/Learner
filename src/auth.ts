@@ -39,6 +39,8 @@ export async function executeGraphQL<T>(
     "Content-Type": "application/json",
     "X-Client-Id": config.clientId,
     "X-Client-Secret": config.clientSecret,
+    "X-Forwarded-For": "127.0.0.1",
+    "X-Forwarded-Proto": "https",
   };
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(config.graphqlEndpoint, {

@@ -37,6 +37,15 @@ export enum AccountStatus {
   Suspended = 'SUSPENDED'
 }
 
+export type AttachedText = {
+  __typename?: 'AttachedText';
+  id: Scalars['String']['output'];
+  language: Scalars['String']['output'];
+  level: Scalars['String']['output'];
+  status: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+};
+
 export type AuthResult = {
   __typename?: 'AuthResult';
   accountId: Scalars['ID']['output'];
@@ -84,7 +93,7 @@ export type BlogMutationsRemoveRemoteObjectArgs = {
 
 export type BlogPost = {
   __typename?: 'BlogPost';
-  attachedTexts?: Maybe<Array<ReaderText>>;
+  attachedTexts?: Maybe<Array<AttachedText>>;
   content?: Maybe<Scalars['String']['output']>;
   createdAt?: Maybe<Scalars['DateTime']['output']>;
   id: Scalars['String']['output'];
@@ -511,6 +520,13 @@ export enum ReaderTextStatus {
   Archived = 'ARCHIVED'
 }
 
+export type RelatedTopic = {
+  __typename?: 'RelatedTopic';
+  extract?: Maybe<Scalars['String']['output']>;
+  pageUrl: Scalars['String']['output'];
+  title: Scalars['String']['output'];
+};
+
 /** A user identity on a remote provider. */
 export type RemoteUser = {
   __typename?: 'RemoteUser';
@@ -591,8 +607,20 @@ export type Summary = {
 
 export type WikiQueries = {
   __typename?: 'WikiQueries';
+  wikipediaRelatedTopics: Array<RelatedTopic>;
+  wikipediaSearch: Array<Summary>;
   wikipediaSummary?: Maybe<Summary>;
   wiktionaryEntry?: Maybe<Entry>;
+};
+
+
+export type WikiQueriesWikipediaRelatedTopicsArgs = {
+  title: Scalars['String']['input'];
+};
+
+
+export type WikiQueriesWikipediaSearchArgs = {
+  query: Scalars['String']['input'];
 };
 
 
@@ -669,7 +697,7 @@ export type LocateBlogPostQueryVariables = Exact<{
 }>;
 
 
-export type LocateBlogPostQuery = { __typename?: 'Query', blogQueries: { __typename?: 'BlogQueries', locateBlogPost?: { __typename?: 'BlogPost', id: string, title: string, content?: string | null, tags?: Array<string> | null, remoteObject?: Array<string> | null, language?: string | null, parentId?: string | null, createdAt?: any | null, updatedAt?: any | null, parent?: { __typename?: 'BlogPost', id: string, title: string, parent?: { __typename?: 'BlogPost', id: string, title: string } | null } | null, type?: { __typename?: 'BlogPostType', id: string, name: string } | null, attachedTexts?: Array<{ __typename?: 'ReaderText', id: string, title: string, language: string, level: CefrLevel, status: ReaderTextStatus }> | null } | null } };
+export type LocateBlogPostQuery = { __typename?: 'Query', blogQueries: { __typename?: 'BlogQueries', locateBlogPost?: { __typename?: 'BlogPost', id: string, title: string, content?: string | null, tags?: Array<string> | null, remoteObject?: Array<string> | null, language?: string | null, parentId?: string | null, createdAt?: any | null, updatedAt?: any | null, parent?: { __typename?: 'BlogPost', id: string, title: string, parent?: { __typename?: 'BlogPost', id: string, title: string } | null } | null, type?: { __typename?: 'BlogPostType', id: string, name: string } | null, attachedTexts?: Array<{ __typename?: 'AttachedText', id: string, title: string, language: string, level: string, status: string }> | null } | null } };
 
 export type RemoveRemoteObjectMutationVariables = Exact<{
   postId: Scalars['ID']['input'];
@@ -708,6 +736,20 @@ export type LocateReaderTextsQueryVariables = Exact<{
 
 export type LocateReaderTextsQuery = { __typename?: 'Query', hadesQueries: { __typename?: 'HadesQueries', locateReaderTexts: Array<{ __typename?: 'ReaderText', id: string, title: string, language: string, level: CefrLevel, status: ReaderTextStatus }> } };
 
+export type WikipediaRelatedTopicsQueryVariables = Exact<{
+  title: Scalars['String']['input'];
+}>;
+
+
+export type WikipediaRelatedTopicsQuery = { __typename?: 'Query', wikiQueries: { __typename?: 'WikiQueries', wikipediaRelatedTopics: Array<{ __typename?: 'RelatedTopic', title: string, pageUrl: string, extract?: string | null }> } };
+
+export type WikipediaSearchQueryVariables = Exact<{
+  query: Scalars['String']['input'];
+}>;
+
+
+export type WikipediaSearchQuery = { __typename?: 'Query', wikiQueries: { __typename?: 'WikiQueries', wikipediaSearch: Array<{ __typename?: 'Summary', title: string, extract?: string | null, pageUrl?: string | null, thumbnailUrl?: string | null }> } };
+
 export type WikipediaSummaryQueryVariables = Exact<{
   title: Scalars['String']['input'];
 }>;
@@ -736,5 +778,7 @@ export const LoginDocument = {"kind":"Document","definitions":[{"kind":"Operatio
 export const MeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"me"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"gaiaQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"me"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"username"}},{"kind":"Field","name":{"kind":"Name","value":"personId"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]}}]} as unknown as DocumentNode<MeQuery, MeQueryVariables>;
 export const HadesTextsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"hadesTexts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pagination"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"PaginationInput"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"hadesQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"texts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"pagination"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pagination"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"language"}},{"kind":"Field","name":{"kind":"Name","value":"level"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"page"}},{"kind":"Field","name":{"kind":"Name","value":"size"}},{"kind":"Field","name":{"kind":"Name","value":"totalPages"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"hasNextPage"}},{"kind":"Field","name":{"kind":"Name","value":"hasPreviousPage"}}]}}]}}]}}]}}]} as unknown as DocumentNode<HadesTextsQuery, HadesTextsQueryVariables>;
 export const LocateReaderTextsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"locateReaderTexts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ids"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"hadesQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"locateReaderTexts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ids"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ids"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"language"}},{"kind":"Field","name":{"kind":"Name","value":"level"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]}}]} as unknown as DocumentNode<LocateReaderTextsQuery, LocateReaderTextsQueryVariables>;
+export const WikipediaRelatedTopicsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"wikipediaRelatedTopics"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikiQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikipediaRelatedTopics"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"pageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"extract"}}]}}]}}]}}]} as unknown as DocumentNode<WikipediaRelatedTopicsQuery, WikipediaRelatedTopicsQueryVariables>;
+export const WikipediaSearchDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"wikipediaSearch"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"query"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikiQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikipediaSearch"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"query"},"value":{"kind":"Variable","name":{"kind":"Name","value":"query"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"extract"}},{"kind":"Field","name":{"kind":"Name","value":"pageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"thumbnailUrl"}}]}}]}}]}}]} as unknown as DocumentNode<WikipediaSearchQuery, WikipediaSearchQueryVariables>;
 export const WikipediaSummaryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"wikipediaSummary"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikiQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikipediaSummary"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"extract"}},{"kind":"Field","name":{"kind":"Name","value":"pageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"thumbnailUrl"}}]}}]}}]}}]} as unknown as DocumentNode<WikipediaSummaryQuery, WikipediaSummaryQueryVariables>;
 export const WiktionaryEntryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"wiktionaryEntry"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"word"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikiQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wiktionaryEntry"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"word"},"value":{"kind":"Variable","name":{"kind":"Name","value":"word"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"word"}},{"kind":"Field","name":{"kind":"Name","value":"definitions"}},{"kind":"Field","name":{"kind":"Name","value":"sourceUrl"}}]}}]}}]}}]} as unknown as DocumentNode<WiktionaryEntryQuery, WiktionaryEntryQueryVariables>;
