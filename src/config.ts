@@ -14,7 +14,7 @@ export type LearnerConfig = {
    */
   clientSecret: string;
   /**
-   * OpenAI API key for Muse Spark.
+   * OpenAI API key for LLM.
    */
   openaiApiKey: string;
   /**
@@ -52,9 +52,9 @@ export function loadConfig(): LearnerConfig {
   if (!openaiBaseUrl) {
     throw new Error("Missing OPENAI_BASE_URL");
   }
-  const model = process.env.OPENAI_MODEL ?? process.env.MUSE_SPARK_MODEL;
+  const model = process.env.OPENAI_MODEL;
   if (!model) {
-    throw new Error("Missing OPENAI_MODEL or MUSE_SPARK_MODEL");
+    throw new Error("Missing OPENAI_MODEL");
   }
   return {
     graphqlEndpoint,

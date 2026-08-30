@@ -30,7 +30,7 @@ export function buildMarkdown(args: MarkdownArgs): string {
     lines.push(`${idx + 1}. ${a.question}`);
     lines.push(`   - My answer: ${a.myAnswer}`);
     lines.push(
-      `   - ${a.correct ? "Correct" : `Wrong — correct: ${a.correctAnswer}`}`,
+      `   - ${a.correct ? "Correct" : `Wrong - correct: ${a.correctAnswer}`}`,
     );
     if (a.explanation) lines.push(`   - ${a.explanation}`);
   });
@@ -39,7 +39,7 @@ export function buildMarkdown(args: MarkdownArgs): string {
   if (args.gaps.length) {
     args.gaps.forEach((g) => lines.push(`- ${g}`));
   } else {
-    lines.push("- none — all correct");
+    lines.push("- none - all correct");
   }
   if (args.related.length) {
     lines.push("");

@@ -57,6 +57,7 @@ program
   .option("--source <kind>", "source kind", "wikipedia")
   .option("--dry-run", "do not write blog")
   .action(async (topic: string, opts: LearnOptions) => {
+    topic = topic.trim().replace(/#+$/, "").trim();
     const username = process.env.SUN_USERNAME ?? process.env.USERNAME;
     const password = process.env.SUN_PASSWORD ?? process.env.PASSWORD;
     if (!username || !password)
@@ -69,7 +70,9 @@ program
       console.error(chalk.red(`No Wikipedia summary for "${topic}"`));
       process.exit(1);
     }
-    console.log(chalk.dim(`Wiki: ${summary.title} — ${summary.extract.slice(0, 120)}…`));
+    console.log(
+      chalk.dim(`Wiki: ${summary.title} - ${summary.extract.slice(0, 120)}…`),
+    );
 
     let parentId: string | null = null;
     let parentTitle: string | null = null;
@@ -80,9 +83,14 @@ program
         parentTitle = found.title;
       }
     } else {
-      const suggested = await findBestParentByWikiExtract(summary.extract, token);
+      const suggested = await findBestParentByWikiExtract(
+        summary.extract,
+        token,
+      );
       if (suggested) {
-        console.log(chalk.dim(`Suggested parent from wiki: ${suggested.title}`));
+        console.log(
+          chalk.dim(`Suggested parent from wiki: ${suggested.title}`),
+        );
       }
       const picked = await pickParentInteractive(token, suggested);
       parentId = picked.id;

@@ -11,7 +11,7 @@ Output JSON:
 ```json
 {
   "questions": [
-    {"type":"mcq","stem":"...","options":["A","B","C","D"],"answer":"A","explanation":"..."},
+    {"type":"mcq","stem":"...","options":["full phrase 1","full phrase 2","full phrase 3","full phrase 4"],"answer":"full phrase 2","explanation":"..."},
     {"type":"fill","stem":"... ____ ...","answer":"...","explanation":"..."},
     {"type":"short","stem":"...","answer":"...","explanation":"..."}
   ],
@@ -19,4 +19,4 @@ Output JSON:
 }
 ```
 
-Rules: 50% mcq, 25% fill, 25% short; explanations verbatim wiki span; suggestions from wikipediaRelatedTopics titles; no banned words; mix lengths; active voice.
+Rules: 50% mcq, 25% fill, 25% short; mcq options 4 distinct full phrases, randomize correct position across A-D (not always A); explanations verbatim wiki span; suggestions from wikipediaRelatedTopics titles; no banned words; mix lengths; active voice.

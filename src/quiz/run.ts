@@ -43,14 +43,19 @@ export type QuizRunResult = {
 /**
  * Runs interactive quiz loop.
  */
-export async function runQuiz(questions: QuizQuestion[], token: string): Promise<QuizRunResult> {
+export async function runQuiz(
+  questions: QuizQuestion[],
+  token: string,
+): Promise<QuizRunResult> {
   let correct = 0;
   const answers: QuizAnswer[] = [];
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i];
     console.log(chalk.bold(`\nQ${i + 1} [${q.type}] ${q.stem}`));
     if (q.type === "mcq" && q.options) {
-      q.options.forEach((opt, idx) => console.log(`  ${String.fromCharCode(65 + idx)}. ${opt}`));
+      q.options.forEach((opt, idx) =>
+        console.log(`  ${String.fromCharCode(65 + idx)}. ${opt}`),
+      );
     }
     const { answer } = await promptInput<{ answer: string }>({
       type: "input",
@@ -60,9 +65,19 @@ export async function runQuiz(questions: QuizQuestion[], token: string): Promise
     const result = await gradeAnswer(q, answer, token);
     const isCorrect = result.correct;
     if (isCorrect) correct++;
-    console.log(isCorrect ? chalk.green("Correct") : chalk.red(`Wrong — correct: ${q.answer}`));
+    console.log(
+      isCorrect
+        ? chalk.green("Correct")
+        : chalk.red(`Wrong - correct: ${q.answer}`),
+    );
     if (q.explanation) console.log(chalk.dim(q.explanation));
-    answers.push({ question: q.stem, myAnswer: answer, correct: isCorrect, correctAnswer: q.answer, explanation: q.explanation });
+    answers.push({
+      question: q.stem,
+      myAnswer: answer,
+      correct: isCorrect,
+      correctAnswer: q.answer,
+      explanation: q.explanation,
+    });
   }
   const gaps = answers.filter((a) => !a.correct).map((a) => a.question);
   return { answers, correct, gaps };

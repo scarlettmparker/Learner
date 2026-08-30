@@ -8,6 +8,7 @@ description: Use when writing markdown for quiz child blog from answers
 Writes child blog markdown from quiz answers. Loads anti-ai-slop-writing.
 
 Template:
+
 ```
 Source: [Title](pageUrl)
 
@@ -17,7 +18,7 @@ Source: [Title](pageUrl)
 ### What I answered
 1. stem
    - My answer: verbatim
-   - Correct/Wrong — correct: verbatim
+   - Correct/Wrong - correct: verbatim
 
 ### Gaps
 - bullet per wrong, minimal LLM, 2-3 bullets max
