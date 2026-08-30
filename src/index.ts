@@ -131,7 +131,7 @@ program
       token,
     );
     console.log(
-      chalk.green(`\nCreated child blog "${titleWithDate}" → /blog/${newId}`),
+      chalk.green(`\nCreated child blog "${titleWithDate}" - /blog/${newId}`),
     );
 
     if (related.length) {
