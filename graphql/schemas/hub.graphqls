@@ -1,0 +1,54 @@
+enum HubMode {
+  dev
+  serve
+}
+
+type HubApp {
+  key: String!
+  name: String!
+  dir: String!
+  devPort: Int!
+  prodPort: Int!
+  url: String!
+  description: String!
+  enabled: Boolean!
+  self: Boolean!
+}
+
+type HubRegistry {
+  mode: HubMode!
+  apps: [HubApp!]!
+}
+
+input HubAppInput {
+  key: String!
+  name: String!
+  dir: String!
+  devPort: Int!
+  prodPort: Int!
+  url: String!
+  description: String!
+  enabled: Boolean!
+  self: Boolean!
+}
+
+input HubRegistryInput {
+  mode: HubMode!
+  apps: [HubAppInput!]!
+}
+
+type GaiaQueries {
+  hubRegistry: HubRegistry
+}
+
+type GaiaMutations {
+  saveRegistry(input: HubRegistryInput!): HubRegistry
+}
+
+extend type Query {
+  gaiaQueries: GaiaQueries!
+}
+
+extend type Mutation {
+  gaiaMutations: GaiaMutations!
+}

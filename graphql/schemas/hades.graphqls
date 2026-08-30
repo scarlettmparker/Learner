@@ -1,0 +1,46 @@
+type ReaderText {
+  id: String!
+  title: String!
+  content: String!
+  language: String!
+  level: CefrLevel!
+  status: ReaderTextStatus!
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type PagedReaderTexts {
+  items: [ReaderText!]!
+  pageInfo: PageInfo!
+}
+
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum ReaderTextStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+type HadesQueries {
+  texts(pagination: PaginationInput): PagedReaderTexts!
+  locateReaderTexts(ids: [ID!]!): [ReaderText!]!
+}
+
+extend type Query {
+  hadesQueries: HadesQueries!
+}
+
+extend type Mutation {
+  hadesMutations: HadesMutations!
+}
+
+type HadesMutations {
+  dummy: String
+}

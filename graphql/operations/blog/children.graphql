@@ -1,0 +1,29 @@
+query children($parentId: ID!, $pagination: PaginationInput) {
+  blogQueries {
+    children(parentId: $parentId, pagination: $pagination) {
+      items {
+        id
+        title
+        content
+        tags
+        remoteObject
+        language
+        parentId
+        type {
+          id
+          name
+        }
+        createdAt
+        updatedAt
+      }
+      pageInfo {
+        page
+        size
+        totalPages
+        totalCount
+        hasNextPage
+        hasPreviousPage
+      }
+    }
+  }
+}

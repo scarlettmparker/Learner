@@ -1,0 +1,74 @@
+type StandardError {
+  message: String!
+}
+
+type QuerySuccess {
+  message: String!
+  id: ID
+}
+
+union QueryResult = QuerySuccess | StandardError
+
+input PaginationInput {
+  page: Int
+  size: Int
+  sortBy: String
+  sortDir: SortDirection
+  sorts: [SortInput!]
+  filters: [FilterInput!]
+}
+
+input SortInput {
+  field: String!
+  dir: SortDirection!
+}
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+input FilterInput {
+  field: String!
+  operator: FilterOperator!
+  value: String!
+}
+
+enum FilterOperator {
+  EQUALS
+  NOT_EQUALS
+  MATCHES
+  STARTS_WITH
+  ENDS_WITH
+  GREATER_THAN
+  LESS_THAN
+  GREATER_THAN_OR_EQUAL
+  LESS_THAN_OR_EQUAL
+  IN
+}
+
+type PageInfo {
+  page: Int!
+  size: Int!
+  totalPages: Int!
+  totalCount: Int!
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+}
+
+"""
+A user identity on a remote provider.
+"""
+type RemoteUser {
+  type: RemoteUserType!
+  id: String!
+}
+
+enum RemoteUserType {
+  DISCORD
+}
+
+input RemoteUserInput {
+  type: RemoteUserType!
+  id: String!
+}

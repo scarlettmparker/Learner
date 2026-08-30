@@ -1,0 +1,15 @@
+mutation ingestBlogFromSource($input: IngestBlogInput!) {
+  blogMutations {
+    ingestBlogFromSource(input: $input) {
+      ... on QuerySuccess {
+        __typename
+        message
+        id
+      }
+      ... on StandardError {
+        __typename
+        message
+      }
+    }
+  }
+}

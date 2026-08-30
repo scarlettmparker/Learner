@@ -1,0 +1,36 @@
+type GalleryItem {
+  id: String!
+  title: String!
+  description: String
+  content: String
+  imagePath: String
+  remoteObject: [String!]
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+input GalleryItemInput {
+  title: String!
+  description: String
+  content: String
+  imagePath: String
+  remoteObject: [String!]
+}
+
+type GalleryQueries {
+  list: [GalleryItem]
+  locate(id: ID!): GalleryItem
+  listByRemoteObjects(ids: [String!]!): [GalleryItem]
+}
+
+type GalleryMutations {
+  create(input: GalleryItemInput): QueryResult
+}
+
+extend type Query {
+  galleryQueries: GalleryQueries!
+}
+
+extend type Mutation {
+  galleryMutations: GalleryMutations!
+}

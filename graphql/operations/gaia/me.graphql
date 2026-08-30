@@ -1,0 +1,12 @@
+query me {
+  gaiaQueries {
+    me {
+      id
+      username
+      personId
+      status
+      createdAt
+      updatedAt
+    }
+  }
+}

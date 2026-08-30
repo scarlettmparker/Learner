@@ -1,0 +1,20 @@
+type Song {
+  id: String!
+  path: String!
+  name: String
+  stems: [Stem]
+}
+
+type Stem {
+  path: String!
+  name: String
+}
+
+type StemPlayerQueries {
+  list: [Song]
+  locate(id: ID!): Song
+}
+
+extend type Query {
+  stemPlayerQueries: StemPlayerQueries!
+}

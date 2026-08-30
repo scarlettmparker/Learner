@@ -1,0 +1,6 @@
+{
+  "instructions": ["~/.config/opencode/instructions/global-conventions.md"],
+  "skills": {
+    "paths": ["~/.config/opencode/skills", ".opencode/skills"]
+  }
+}

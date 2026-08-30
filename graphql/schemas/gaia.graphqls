@@ -1,0 +1,80 @@
+scalar JSON
+
+type PagedAccounts {
+  items: [Account!]!
+  pageInfo: PageInfo!
+}
+
+type Account {
+  id: String!
+  username: String!
+  personId: ID!
+  status: AccountStatus!
+  provider: String
+  remoteUsers: [RemoteUser!]
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
+  DEACTIVATED
+}
+
+type Role {
+  id: ID!
+  name: String!
+  description: String
+  createdAt: DateTime
+  updatedAt: DateTime
+}
+
+type GaiaQueries {
+  me: Account
+  propertySet(ownerKey: String!, name: String!, entry: String): JSON
+  myRoles: [String!]!
+  account(id: ID!): Account
+  accounts(pagination: PaginationInput): PagedAccounts!
+  roles: [Role!]!
+  role(id: ID!): Role
+  accountRoles(accountId: ID!): [String!]!
+  accountPermissions(accountId: ID!): [String!]!
+  rolePermissions(roleId: ID!): [String!]!
+  allPermissions: [String!]!
+}
+
+input LoginInput {
+  username: String!
+  password: String!
+}
+
+type AuthResult {
+  token: String!
+  accountId: ID!
+  personId: ID!
+}
+
+type GaiaMutations {
+  login(input: LoginInput!): AuthResult
+  logout: QueryResult
+  suspendAccount(id: ID!): QueryResult
+  unsuspendAccount(id: ID!): QueryResult
+  createRole(name: String!, description: String): Role
+  deleteRole(id: ID!): QueryResult
+  setAccountRoles(accountId: ID!, roleNames: [String!]!): QueryResult
+  setAccountPermissions(accountId: ID!, permissions: [String!]!): QueryResult
+  setRolePermissions(roleId: ID!, permissions: [String!]!): QueryResult
+  deactivateAccount: QueryResult
+  requestAccountReactivation(email: String!, provider: String!): QueryResult
+  confirmAccountReactivation(token: String!): QueryResult
+}
+
+extend type Query {
+  gaiaQueries: GaiaQueries!
+}
+
+extend type Mutation {
+  gaiaMutations: GaiaMutations!
+}

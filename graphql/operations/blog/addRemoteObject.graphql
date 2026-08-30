@@ -1,0 +1,15 @@
+mutation addRemoteObject($postId: ID!, $target: String!) {
+  blogMutations {
+    addRemoteObject(postId: $postId, target: $target) {
+      ... on QuerySuccess {
+        __typename
+        message
+        id
+      }
+      ... on StandardError {
+        __typename
+        message
+      }
+    }
+  }
+}

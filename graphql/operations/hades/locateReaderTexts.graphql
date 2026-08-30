@@ -1,0 +1,11 @@
+query locateReaderTexts($ids: [ID!]!) {
+  hadesQueries {
+    locateReaderTexts(ids: $ids) {
+      id
+      title
+      language
+      level
+      status
+    }
+  }
+}

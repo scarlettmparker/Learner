@@ -1,0 +1,9 @@
+query wiktionaryEntry($word: String!) {
+  wikiQueries {
+    wiktionaryEntry(word: $word) {
+      word
+      definitions
+      sourceUrl
+    }
+  }
+}

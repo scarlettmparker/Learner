@@ -1,0 +1,9 @@
+query blogPostTypes {
+  blogQueries {
+    blogPostTypes {
+      id
+      name
+      description
+    }
+  }
+}

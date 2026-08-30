@@ -1,0 +1,20 @@
+query hadesTexts($pagination: PaginationInput) {
+  hadesQueries {
+    texts(pagination: $pagination) {
+      items {
+        id
+        title
+        language
+        level
+      }
+      pageInfo {
+        page
+        size
+        totalPages
+        totalCount
+        hasNextPage
+        hasPreviousPage
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+query wikipediaSummary($title: String!) {
+  wikiQueries {
+    wikipediaSummary(title: $title) {
+      title
+      extract
+      pageUrl
+      thumbnailUrl
+    }
+  }
+}
