@@ -1,6 +1,6 @@
 import { callMuseSpark, type ChatMessage } from "../llm/client.js";
 import type { WikiSummary, RelatedTopic } from "../sources/wikipedia.js";
-import { parseQuizResponse } from "./parse.js";
+import { parseMarkdownToQuiz } from "./parse-markdown.js";
 
 export type QuizQuestion = {
   /**
@@ -56,7 +56,11 @@ export type GenerateArgs = {
 };
 
 /**
- * Generates quiz via LLM with anti-ai-slop constraints.
+ * Generates quiz via Muse Spark with anti-ai-slop constraints.
+ *
+ * @param props - generation args
+ * @param _token - unused auth token
+ * @returns quiz
  */
 export async function generateQuiz(
   props: GenerateArgs,
@@ -68,10 +72,25 @@ export async function generateQuiz(
     content: `You are Sun Learn's quiz generator. Create an interactive quiz from the Wikipedia extract below.
 
 Rules:
-- Output valid JSON only, no markdown, no code block, no extra text: {"questions":[{...}]}
-- Each mcq: 4 distinct plausible options (full phrases, not "A" "B"), one correct, three distractors from the extract's key concepts. Randomize which position (A-D) holds the correct answer; do not always put it at A. Vary correct positions across questions.
-- Each fill: sentence with ____ blank.
-- Each short: open question with concise answer (1-2 words or short phrase).
+- Output markdown only, no JSON, no code block wrapper.
+- Format exactly:
+Q1 [mcq] What is ...?
+A. full phrase
+B. full phrase
+C. full phrase
+D. full phrase
+Answer: full phrase of correct option
+Explain: short wiki span
+
+Q2 [fill] Sentence with ____ blank.
+Answer: word
+Explain: wiki span
+
+Q3 [short] Open question?
+Answer: concise phrase
+Explain: wiki span
+
+- Each mcq: 4 distinct plausible full phrases, randomize correct position across A-D, distractors from extract's key concepts.
 - Keep stems and options verbatim-friendly to the wiki extract; explanations must quote a short wiki span.
 - Follow anti-ai-slop: avoid banned words (delve, tapestry, vibrant, pivotal, crucial, intricate, meticulous, comprehensive, foster, leverage, utilize, seamless, robust, groundbreaking, transformative), mix sentence lengths, no rule-of-three, active voice, ≤1 em dash per 500 words.
 
@@ -85,14 +104,15 @@ Wiki extract: ${args.summary.extract}
 PageUrl: ${args.summary.pageUrl}
 Prior KNOWLEDGE titles: ${args.priorContext || "(none)"}
 Related topics: ${args.related.map((r) => r.title).join(", ") || "(none)"}
-Generate ${args.numQuestions} questions: 50% mcq, 25% fill, 25% short. Return JSON only with questions and no suggestions.`,
+Generate ${args.numQuestions} questions: 50% mcq, 25% fill, 25% short. Return markdown only.`,
   };
   const text = await callMuseSpark([system, user]);
-  const parsed = parseQuizResponse(text, args);
-  if (parsed) return parsed;
-  throw new Error(
-    `Failed to generate quiz - response was not valid JSON: ${text.slice(0, 400)}`,
-  );
+  const parsed = parseMarkdownToQuiz(text, args);
+  if (parsed) {
+    return parsed;
+  }
+
+  throw new Error(`Failed to generate quiz - response was not markdown: ${text.slice(0, 600)}`);
 }
 
 /**
