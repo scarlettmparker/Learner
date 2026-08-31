@@ -278,7 +278,11 @@ function resolveDifficultyAndCount(
       count: parseInt(opts.questions, 10) || 20,
       difficulty: "advanced",
     };
-  const hasCustomCount = opts.questions !== "6" && opts.questions !== "15" && opts.questions !== "10" && opts.questions !== "5";
+  const hasCustomCount =
+    opts.questions !== "6" &&
+    opts.questions !== "15" &&
+    opts.questions !== "10" &&
+    opts.questions !== "5";
   if (hasCustomCount) {
     const n = parseInt(opts.questions, 10);
     if (!Number.isNaN(n))
@@ -428,7 +432,7 @@ async function promptRecurring(
     type: "input",
     name: "choice",
     message:
-      "What do you want to learn more of? Enter number 1..N, type a new topic, or Enter to finish:",
+      "What do you want to learn more of? Type a new topic, or Enter to finish:",
   });
   if (!choice || !choice.trim())
     return { nextTopic: null, nextDifficulty: "same" };
@@ -606,13 +610,25 @@ program
 
 program
   .command("learn")
-  .argument("<topic>", "topic to learn")
+  .argument("[topic]", "topic to learn")
   .option("--parent <title>", "parent blog title")
   .option("--questions <n>", "number of questions", "10")
   .option("--difficulty <level>", "difficulty: basic|same|advanced", "same")
   .option("--source <kind>", "source kind", "wikipedia")
   .option("--dry-run", "do not write blog")
-  .action(async (topic: string, opts: LearnOptions) => {
+  .action(async (topic: string | undefined, opts: LearnOptions) => {
+    if (!topic || !topic.trim()) {
+      const { topic: prompted } = await promptInput<{ topic: string }>({
+        type: "input",
+        name: "topic",
+        message: "What do you want to learn?",
+      });
+      topic = prompted?.trim();
+      if (!topic) {
+        console.log(chalk.yellow("No topic given, aborting."));
+        return;
+      }
+    }
     const { token } = await resolveAuth();
     await runLearnSession(topic, opts, token);
   });
