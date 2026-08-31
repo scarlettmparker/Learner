@@ -100,12 +100,12 @@ Q3 [short] Open question?
 Answer: concise phrase
 Explain: wiki span
 
-- Each mcq: 4 distinct full phrases, randomize correct position across A-D, distractors from extract's key concepts, deduplicate stem/options (no option repeats stem substring >5 chars), never placeholders like A/B/C/D or Not ...1.
- - You MUST generate the exact number requested (5 for basic/easy, 10 for same/normal, 20 for advanced). Do not stop at 4. Count Q1..Qn and push to the full count; if you run short, pull from different sections, dates, and related topics.
+ - Each mcq: 4 distinct full phrases, randomize correct position across A-D, distractors from extract's key concepts, deduplicate stem/options (no option repeats stem substring >5 chars), never placeholders like A/B/C/D or Not ...1.
+  - You MUST generate the exact number requested (5 for basic/easy, 10 for same/normal, 15-20 for advanced hard floor 15 target 20 accept >=15). Do not stop at 4. Count Q1..Qn and push to the full count; if you run short, pull from different sections, dates, and related topics.
  - Keep stems and options close to the wiki extract; explanations must quote a short wiki span only (no PageUrl, source is at top).
  - When difficulty advanced/mastery true, use synthesis across sections not just definitions. You must get harder as prior attempts show mastery -add synthesis, application, comparison, dating, relation questions. If you stay on definitions the learner stalls.
-- Fill blanks must say what kind of answer you expect when it could be vague. Don't write "The treaty was signed in ____." when you want 1919 -write "The treaty was signed in ____ [year]." or "In what year was the treaty signed?" Same for titles, names, places: "in ____ [work]" or "the book ____ [title]". The blank itself doesn't tell the learner if you want a year, a name, or a title, so add [year], [person], [work], [place] or phrase it as a clear question instead of leaving it bare. Every fill must be grammatically correct as an intentional fragment. Read the stem with the answer inserted; it must sound right. Don't write "would ____ [activity]" and expect a gerund like "undermining the process" — that reads "would undermining" and is wrong. Write "would ____ [verb]" for the base form or "would result in ____ [noun phrase]" for the gerund.
-- Don't carve two fills out of one sentence. A common failure is blanking two words from the same source sentence — both Explains quote that one sentence and only the blank moves. That's a repeat, even though the blank word differs. If you use a sentence for one Explain, pick a different sentence or a different paragraph for the next. Explain spans shouldn't share more than a handful of words; stems shouldn't be the same sentence with a different word blanked.
+- Fill blanks must say what kind of answer you expect when it could be vague. Don't write "The treaty was signed in ____." when you want 1919 -write "The treaty was signed in ____ [year]." or "In what year was the treaty signed?" Same for titles, names, places: "in ____ [work]" or "the book ____ [title]". The blank itself doesn't tell the learner if you want a year, a name, or a title, so add [year], [person], [work], [place] or phrase it as a clear question instead of leaving it bare. Every fill must be grammatically correct as an intentional fragment. Read the stem with the answer inserted; it must sound right. Don't write "would ____ [activity]" and expect a gerund like "undermining the process" 0 that reads "would undermining" and is wrong. Write "would ____ [verb]" for the base form or "would result in ____ [noun phrase]" for the gerund.
+- Don't carve two fills out of one sentence. A common failure is blanking two words from the same source sentence 0 both Explains quote that one sentence and only the blank moves. That's a repeat, even though the blank word differs. If you use a sentence for one Explain, pick a different sentence or a different paragraph for the next. Explain spans shouldn't share more than a handful of words; stems shouldn't be the same sentence with a different word blanked.
 - Every question must test a different fact and a different span: no two share the same normalized answer (lowercase, strip punctuation, singularise) or the same quoted span. Answers across the quiz must be distinct after lowercasing and singularising.
  - Founder or origin questions (e.g., who introduced a concept) allowed at most once per quiz, and only if not already stated in prior stems; don't leak later answers in earlier stems or options.
  - Answer lines must be bare phrase only, never "A. phrase" or "B. phrase" - the program shuffles and checks the phrase itself, a prefix breaks grading.
@@ -224,8 +224,14 @@ function sanitizeOptions(options: string[], answer: string): string[] {
   return options.map((opt) => {
     const trimmed = opt.trim();
     if (trimmed.includes("(") && trimmed.includes(")")) {
-      const inside = trimmed.slice(trimmed.indexOf("(") + 1, trimmed.indexOf(")"));
-      if (inside.includes(answer.trim()) || answer.trim().includes(inside.trim())) {
+      const inside = trimmed.slice(
+        trimmed.indexOf("(") + 1,
+        trimmed.indexOf(")"),
+      );
+      if (
+        inside.includes(answer.trim()) ||
+        answer.trim().includes(inside.trim())
+      ) {
         return trimmed.replace(/\s*\(.*?\)\s*/g, "").trim();
       }
       if (/\b\d{4}\b/.test(inside) && /\b\d{4}\b/.test(answer)) {
@@ -281,19 +287,55 @@ export async function generateQuiz(props: GenerateArgs): Promise<Quiz> {
   const system = buildSystemPrompt();
   const user = buildUserPrompt(args);
   const config = loadConfig();
-  const text = await callLLM([system, user], {
+  const neededTokens = Math.max(
+    config.maxOutputTokens ?? 8192,
+    args.numQuestions * 350,
+  );
+  let text = await callLLM([system, user], {
     effort: config.reasoningEffort,
     verbosity: config.verbosity,
-    maxOutputTokens: config.maxOutputTokens,
+    maxOutputTokens: neededTokens,
   });
-  const parsed = parseMarkdownToQuiz(text, args);
-  if (parsed) {
-    const deduped = dedupQuiz(parsed);
-    return shuffleAndInterleave(deduped);
+  let parsed = parseMarkdownToQuiz(text, args);
+  if (!parsed)
+    throw new Error(
+      `Failed to generate quiz - response was not markdown: ${text.slice(0, 600)}`,
+    );
+  let deduped = dedupQuiz(parsed);
+  const floor = args.difficulty === "advanced" ? 15 : args.numQuestions;
+  let attempts = 0;
+  while (
+    (deduped.questions.length < args.numQuestions ||
+      (args.difficulty === "advanced" && deduped.questions.length < floor)) &&
+    attempts < 2
+  ) {
+    const need = args.numQuestions - deduped.questions.length;
+    if (need <= 0 && deduped.questions.length >= floor) break;
+    const remaining = need > 0 ? need : floor - deduped.questions.length;
+    const existingStems = deduped.questions.map((q) => q.stem).join("\n");
+    const existingAnswers = deduped.questions.map((q) => q.answer).join(", ");
+    const supplementUser: ChatMessage = {
+      role: "user",
+      content: `You returned ${deduped.questions.length}/${args.numQuestions} (floor ${floor} for advanced). Generate ${remaining} MORE distinct questions to reach ${args.numQuestions}. Do not repeat any existing stem/answer/Explain span.\nExisting stems:\n${existingStems}\nExisting answers: ${existingAnswers}\nUse different sections, dates, relations, and examples from the full page. Same format Q${deduped.questions.length + 1}.., same difficulty ${args.difficulty}, same mix. Return markdown only.`,
+    };
+    const extraText = await callLLM([system, supplementUser], {
+      effort: config.reasoningEffort,
+      verbosity: config.verbosity,
+      maxOutputTokens: Math.max(2048, remaining * 400),
+    });
+    const extraParsed = parseMarkdownToQuiz(extraText, {
+      ...args,
+      numQuestions: remaining,
+    });
+    if (!extraParsed) break;
+    const merged: Quiz = {
+      questions: [...deduped.questions, ...extraParsed.questions],
+    };
+    deduped = dedupQuiz(merged);
+    attempts++;
   }
-  throw new Error(
-    `Failed to generate quiz - response was not markdown: ${text.slice(0, 600)}`,
-  );
+
+  return shuffleAndInterleave(deduped);
 }
 
 /**
@@ -393,7 +435,10 @@ function describeQuizIssues(quiz: Quiz): string {
  * @returns stripped
  */
 function stripLabel(s: string): string {
-  return s.replace(/^[A-D][\.\)]\s*/i, "").replace(/^["']|["']$/g, "").trim();
+  return s
+    .replace(/^[A-D][\.\)]\s*/i, "")
+    .replace(/^["']|["']$/g, "")
+    .trim();
 }
 
 export async function gradeAnswer(
@@ -426,7 +471,7 @@ export async function gradeAnswer(
   const system: ChatMessage = {
     role: "system",
     content:
-      "You judge short answers. Read anti-ai-slop-writing references/banned-words.md and be lenient. Return JSON {correct: boolean} only. Accept paraphrase if core idea matches, ignore articles, hedging, order, or synonyms. \"You can never trust a promise\" and \"Promises lose all credibility...\" are the same idea for the farmer maxim. Mark correct when the learner captures the universalization collapse, even if wording differs. Spend minimal thinking, no chain-of-thought.",
+      'You judge short answers. Read anti-ai-slop-writing references/banned-words.md and be lenient. Return JSON {correct: boolean} only. Accept paraphrase if core idea matches, ignore articles, hedging, order, or synonyms. "You can never trust a promise" and "Promises lose all credibility..." are the same idea for the farmer maxim. Mark correct when the learner captures the universalization collapse, even if wording differs. Spend minimal thinking, no chain-of-thought.',
   };
   const user: ChatMessage = {
     role: "user",

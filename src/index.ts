@@ -273,11 +273,11 @@ function resolveDifficultyAndCount(
   const explicit = (difficultyOpt ?? opts.difficulty ?? "").toLowerCase();
   if (explicit === "basic")
     return { count: parseInt(opts.questions, 10) || 5, difficulty: "basic" };
-  if (explicit === "advanced")
-    return {
-      count: parseInt(opts.questions, 10) || 20,
-      difficulty: "advanced",
-    };
+  if (explicit === "advanced") {
+    const parsed = parseInt(opts.questions, 10);
+    const count = Number.isNaN(parsed) ? 20 : Math.max(15, parsed);
+    return { count, difficulty: "advanced" };
+  }
   const hasCustomCount =
     opts.questions !== "6" &&
     opts.questions !== "15" &&
@@ -286,7 +286,10 @@ function resolveDifficultyAndCount(
   if (hasCustomCount) {
     const n = parseInt(opts.questions, 10);
     if (!Number.isNaN(n))
-      return { count: n, difficulty: readinessReady ? "advanced" : "same" };
+      return {
+        count: readinessReady ? Math.max(15, n) : n,
+        difficulty: readinessReady ? "advanced" : "same",
+      };
   }
   if (readinessReady) return { count: 20, difficulty: "advanced" };
   if (explicit === "same" || !explicit)
@@ -331,7 +334,26 @@ async function createOrUpdateBlog(
       ),
     );
     const dateHeader = `\n\n---\n\n## ${formatTitleWithDate(topic)}\n`;
-    const newSection = buildMarkdown({
+    const newSection = buildMarkdown(
+      {
+        topic,
+        summary,
+        fullPage,
+        answers,
+        gaps,
+        related,
+        pageUrl: summary.pageUrl,
+        mastery,
+      },
+      { includeResearch: false },
+    );
+    const updatedContent = `${existing.content ?? ""}${dateHeader}${newSection}`;
+    const newId = await updateBlog(existing.id, updatedContent, token);
+    return newId;
+  }
+  const titleWithDate = formatTitleWithDate(topic);
+  const markdown = buildMarkdown(
+    {
       topic,
       summary,
       fullPage,
@@ -340,22 +362,9 @@ async function createOrUpdateBlog(
       related,
       pageUrl: summary.pageUrl,
       mastery,
-    });
-    const updatedContent = `${existing.content ?? ""}${dateHeader}${newSection}`;
-    const newId = await updateBlog(existing.id, updatedContent, token);
-    return newId;
-  }
-  const titleWithDate = formatTitleWithDate(topic);
-  const markdown = buildMarkdown({
-    topic,
-    summary,
-    fullPage,
-    answers,
-    gaps,
-    related,
-    pageUrl: summary.pageUrl,
-    mastery,
-  });
+    },
+    { includeResearch: true },
+  );
   const newId = await createChildBlog(
     {
       title: titleWithDate,
@@ -541,16 +550,19 @@ async function runLearnSession(
     console.log(chalk.yellow("Dry run, not writing blog"));
     console.log(chalk.dim("\nMarkdown preview:\n"));
     console.log(
-      buildMarkdown({
-        topic,
-        summary: wiki.summary as NonNullable<WikiBucket["summary"]>,
-        fullPage: fullPageEnriched || wiki.fullPage,
-        answers,
-        gaps,
-        related: wiki.related,
-        pageUrl: wiki.summary!.pageUrl,
-        mastery: readinessReady,
-      }),
+      buildMarkdown(
+        {
+          topic,
+          summary: wiki.summary as NonNullable<WikiBucket["summary"]>,
+          fullPage: fullPageEnriched || wiki.fullPage,
+          answers,
+          gaps,
+          related: wiki.related,
+          pageUrl: wiki.summary!.pageUrl,
+          mastery: readinessReady,
+        },
+        { includeResearch: true },
+      ),
     );
     return;
   }

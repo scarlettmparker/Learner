@@ -83,23 +83,27 @@ function buildResultCell(
 /**
  * Builds markdown for child blog, mostly verbatim answers + wiki, minimal LLM.
  */
-export function buildMarkdown(args: MarkdownArgs): string {
+export function buildMarkdown(
+  args: MarkdownArgs,
+  opts?: {
+    /**
+     * Include Source + What was researched header (first attempt only).
+     */
+    includeResearch?: boolean;
+  },
+): string {
+  const includeResearch = opts?.includeResearch ?? true;
   const lines: string[] = [];
   if (args.mastery)
     lines.push("> Mastery detected - expanded to advanced material");
   if (args.mastery) lines.push("");
-  lines.push(`Source: [${args.summary.title}](${args.pageUrl})`);
-  lines.push("");
-  lines.push("### What was researched");
-  lines.push(`> ${args.summary.extract}`);
-  if (args.fullPage) {
+  if (includeResearch) {
+    lines.push(`Source: [${args.summary.title}](${args.pageUrl})`);
     lines.push("");
-    lines.push("### Full page excerpt");
-    lines.push(
-      `> ${args.fullPage.slice(0, 2000)}${args.fullPage.length > 2000 ? "…" : ""}`,
-    );
+    lines.push("### What was researched");
+    lines.push(`> ${args.summary.extract}`);
+    lines.push("");
   }
-  lines.push("");
   lines.push("### What I answered");
   lines.push("| # | Q | Result | Detail |");
   lines.push("|---|---|---|---|");
@@ -115,10 +119,5 @@ export function buildMarkdown(args: MarkdownArgs): string {
   lines.push("### Gaps");
   if (args.gaps.length) args.gaps.forEach((g) => lines.push(`- ${g}`));
   else lines.push("- none - all correct");
-  if (args.related.length) {
-    lines.push("");
-    lines.push("### Related");
-    args.related.forEach((r) => lines.push(`- [${r.title}](${r.pageUrl})`));
-  }
   return lines.join("\n");
 }
