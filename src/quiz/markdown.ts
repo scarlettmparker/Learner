@@ -98,7 +98,7 @@ export function buildMarkdown(
   if (includeResearch) {
     lines.push(`Source: [${args.summary.title}](${args.pageUrl})`);
     lines.push("### What was researched");
-    lines.push(`> ${args.summary.extract}`);
+    lines.push(`> ${args.summary.extract.replace(/\s+/g, " ").trim()}`);
   }
   lines.push("### What I answered");
   lines.push("| # | Q | Result | Detail |");
