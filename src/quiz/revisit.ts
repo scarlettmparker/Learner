@@ -1,4 +1,5 @@
 import { callMuseSpark } from "../llm/client.js";
+import { loadConfig } from "../config.js";
 
 export type PriorAttempt = {
   /**
@@ -160,13 +161,18 @@ export async function assessReadiness(
     const system = {
       role: "system" as const,
       content:
-        "You judge if a learner is ready for advanced material. Return JSON {ready:boolean,gaps:string[],suggestedTopics:string[]} only. ready true when last attempt has no gaps and at least 2 attempts or gaps are minor.",
+        "You judge if a learner is ready for advanced material. Return JSON {ready:boolean,gaps:string[],suggestedTopics:string[]} only. Spend minimal thinking, no chain-of-thought, direct JSON. ready true when last attempt has no gaps and at least 2 attempts or gaps are minor.",
     };
     const user = {
       role: "user" as const,
       content: `Attempts: ${attempts.length}, latest gaps: ${gaps.join(", ") || "none"}, summary: ${summaryExtract.slice(0, 600)}, related: ${relatedTitles.join(", ")}`,
     };
-    const text = await callMuseSpark([system, user]);
+    const config = loadConfig();
+    const text = await callMuseSpark([system, user], {
+      effort: config.fastReasoningEffort,
+      verbosity: config.fastVerbosity,
+      maxOutputTokens: config.assessMaxTokens,
+    });
     const parsed = JSON.parse(text) as ReadinessResult;
     if (typeof parsed.ready === "boolean") {
       return {

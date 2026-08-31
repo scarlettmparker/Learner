@@ -1,4 +1,5 @@
 import { callMuseSpark, type ChatMessage } from "../llm/client.js";
+import { loadConfig } from "../config.js";
 import type { WikiSummary, RelatedTopic } from "../sources/wikipedia.js";
 import { parseMarkdownToQuiz } from "./parse-markdown.js";
 
@@ -75,7 +76,7 @@ export type GenerateArgs = {
 function buildSystemPrompt(): ChatMessage {
   return {
     role: "system",
-    content: `You are Sun Learn's quiz generator. Create an interactive quiz from the Wikipedia extract below.
+    content: `You are Sun Learn's quiz generator. Create an interactive quiz from the Wikipedia extract below. Spend minimal thinking, give results directly.
 
 Rules:
 - Output markdown only, no JSON, no code block wrapper.
@@ -97,12 +98,14 @@ Answer: concise phrase
 Explain: wiki span
 
 - Each mcq: 4 distinct plausible full phrases, randomize correct position across A-D, distractors from extract's key concepts, deduplicate stem/options (no option repeats stem substring >5 chars), never placeholders like A/B/C/D or Not ...1.
-- Keep stems and options verbatim-friendly to the wiki extract; explanations must quote a short wiki span and include pageUrl.
-- When difficulty advanced/mastery true, use synthesis across sections not just definitions.
+- Keep stems and options verbatim-friendly to the wiki extract; explanations must quote a short wiki span only (no PageUrl, source is at top).
+- When difficulty advanced/mastery true, use synthesis across sections not just definitions. Must become harder over time as prior attempts show mastery: increase synthesis, application, comparison, dating, and relation questions. Spaced repetition of concepts is fine but avoid frequent near-duplicates.
+- Founder/thinker questions (e.g., which thinker created ...) are allowed at most once per quiz, and only if not already stated in prior stems; do not leak later answers in earlier stems/options. Earlier questions must not name the entity that is the answer to a later question.
+- Every question must test a different fact/span: no two questions share the same normalized answer (lowercase, strip punctuation) or the same quoted span. Answers across the quiz must be distinct.
 - Follow anti-ai-slop: avoid banned words (delve, tapestry, vibrant, pivotal, crucial, intricate, meticulous, comprehensive, foster, leverage, utilize, seamless, robust, groundbreaking, transformative), mix sentence lengths, no rule-of-three, active voice, ≤1 em dash per 500 words.
 
 Prior KNOWLEDGE context helps you avoid repeating what the user already knows.
-When full page excerpt is provided, ask detailed questions from the full page scrapes (sections, examples, dates, relations), not just the summary.`, 
+When full page excerpt is provided, ask detailed questions from the full page scrapes (sections, examples, dates, relations), not just the summary.`,
   };
 }
 
@@ -139,10 +142,36 @@ export async function generateQuiz(props: GenerateArgs, _token: string): Promise
   const args = props;
   const system = buildSystemPrompt();
   const user = buildUserPrompt(args);
-  const text = await callMuseSpark([system, user]);
+  const config = loadConfig();
+  const text = await callMuseSpark([system, user], {
+    effort: config.reasoningEffort,
+    verbosity: config.verbosity,
+    maxOutputTokens: config.maxOutputTokens,
+  });
   const parsed = parseMarkdownToQuiz(text, args);
-  if (parsed && hasDistinctOptions(parsed)) return parsed;
-  if (parsed) throw new Error(`Quiz had duplicate options: ${text.slice(0, 600)}`);
+  const validated = parsed && hasDistinctOptions(parsed) && hasDistinctAnswersAndStems(parsed) ? parsed : null;
+  if (validated) return validated;
+  if (parsed) {
+    const retryText = await callMuseSpark(
+      [
+        system,
+        user,
+        {
+          role: "user",
+          content: `Prior output had duplicate or leaked questions: ${describeQuizIssues(parsed)} Regenerate with all different facts/answers, no shared answer strings, no cross-question leakage, balanced ~33% each, and harder over time if mastery.`,
+        },
+      ],
+      {
+        effort: config.reasoningEffort,
+        verbosity: config.verbosity,
+        maxOutputTokens: config.maxOutputTokens,
+      },
+    );
+    const reparsed = parseMarkdownToQuiz(retryText, args);
+    if (reparsed && hasDistinctOptions(reparsed) && hasDistinctAnswersAndStems(reparsed)) return reparsed;
+    if (reparsed) throw new Error(`Quiz had duplicate/leaked questions: ${retryText.slice(0, 600)}`);
+    throw new Error(`Failed to generate quiz - retry was not markdown: ${retryText.slice(0, 600)}`);
+  }
   throw new Error(`Failed to generate quiz - response was not markdown: ${text.slice(0, 600)}`);
 }
 
@@ -162,6 +191,51 @@ function hasDistinctOptions(quiz: Quiz): boolean {
     }
   }
   return true;
+}
+
+/**
+ * Checks answers and stems are distinct across questions and not leaked.
+ *
+ * @param quiz - parsed quiz
+ * @returns true if valid
+ */
+function hasDistinctAnswersAndStems(quiz: Quiz): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const answers = quiz.questions.map((q) => norm(q.answer));
+  if (new Set(answers).size !== answers.length) return false;
+  for (let i = 0; i < quiz.questions.length; i++) {
+    for (let j = i + 1; j < quiz.questions.length; j++) {
+      const a = quiz.questions[i];
+      const b = quiz.questions[j];
+      if (norm(a.stem) === norm(b.stem)) return false;
+      if (b.stem.toLowerCase().includes(a.answer.toLowerCase().slice(0, 12)) && a.answer.length > 12) return false;
+      if (a.stem.toLowerCase().includes(b.answer.toLowerCase().slice(0, 12)) && b.answer.length > 12) return false;
+    }
+  }
+  const founderCount = quiz.questions.filter((q) =>
+    /which thinker|who created|who is.*central concept/i.test(q.stem),
+  ).length;
+  if (founderCount > 1) return false;
+  return true;
+}
+
+/**
+ * Describes duplicate/leakage issues for retry prompt.
+ *
+ * @param quiz - parsed quiz with issues
+ * @returns issue description
+ */
+function describeQuizIssues(quiz: Quiz): string {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const seen = new Map<string, number>();
+  const issues: string[] = [];
+  quiz.questions.forEach((q, idx) => {
+    const n = norm(q.answer);
+    const prev = seen.get(n);
+    if (prev !== undefined) issues.push(`Q${prev + 1} and Q${idx + 1} share answer "${q.answer}"`);
+    else seen.set(n, idx);
+  });
+  return issues.join("; ") || "duplicate stems/answers or cross-question leakage";
 }
 
 /**
@@ -190,14 +264,19 @@ export async function gradeAnswer(
   if (question.type === "fill") return { correct: norm(myAnswer) === norm(question.answer) };
   const system: ChatMessage = {
     role: "system",
-    content: "You judge short answers. Return JSON {correct: boolean}.",
+    content: "You judge short answers. Return JSON {correct: boolean} only. Spend minimal thinking, no chain-of-thought.",
   };
   const user: ChatMessage = {
     role: "user",
     content: `Question: ${question.stem}\nCorrect: ${question.answer}\nMy: ${myAnswer}\nJudge:`,
   };
   try {
-    const text = await callMuseSpark([system, user]);
+    const config = loadConfig();
+    const text = await callMuseSpark([system, user], {
+      effort: config.fastReasoningEffort,
+      verbosity: config.fastVerbosity,
+      maxOutputTokens: config.gradeMaxTokens,
+    });
     const parsed = JSON.parse(text) as { correct?: boolean };
     if (typeof parsed.correct === "boolean") return { correct: parsed.correct };
   } catch {}

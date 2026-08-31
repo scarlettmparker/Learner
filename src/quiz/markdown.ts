@@ -52,6 +52,31 @@ function escapeCell(value: string): string {
 }
 
 /**
+ * Cleans detail cell by stripping per-row PageUrl.
+ *
+ * @param detail - raw detail text
+ * @returns cleaned detail
+ */
+function cleanDetail(detail: string): string {
+  return detail.replace(/\s*PageUrl:\s*https?:\/\/\S+/gi, "").trim();
+}
+
+/**
+ * Builds merged result cell keeping [x]/[ ] .
+ *
+ * @param myAns - escaped my answer
+ * @param corr - escaped correct answer
+ * @param correct - whether correct
+ * @returns merged cell
+ */
+function buildResultCell(myAns: string, corr: string, correct: boolean): string {
+  const norm = (s: string) => s.trim().toLowerCase();
+  const same = norm(myAns) === norm(corr);
+  if (correct) return same ? `[x] ${myAns}` : `[x] ${myAns} → ${corr}`;
+  return `${myAns} → [ ] ${corr}`;
+}
+
+/**
  * Builds markdown for child blog, mostly verbatim answers + wiki, minimal LLM.
  */
 export function buildMarkdown(args: MarkdownArgs): string {
@@ -72,15 +97,15 @@ export function buildMarkdown(args: MarkdownArgs): string {
   }
   lines.push("");
   lines.push("### What I answered");
-  lines.push("| # | Q | My answer | Correct | Explain |");
-  lines.push("|---|---|---|---|---|");
+  lines.push("| # | Q | Result | Detail |");
+  lines.push("|---|---|---|---|");
   args.answers.forEach((a, idx) => {
-    const myAns = escapeCell(a.myAnswer);
     const q = escapeCell(a.question);
+    const myAns = escapeCell(a.myAnswer);
     const corr = escapeCell(a.correctAnswer);
-    const expl = escapeCell(a.explanation ?? "");
-    const mark = a.correct ? "[x]" : "[ ]";
-    lines.push(`| ${idx + 1} | ${q} | ${myAns} | ${mark} ${corr} | ${expl} |`);
+    const detail = escapeCell(cleanDetail(a.explanation ?? ""));
+    const result = buildResultCell(myAns, corr, a.correct);
+    lines.push(`| ${idx + 1} | ${q} | ${result} | ${detail} |`);
   });
   lines.push("");
   lines.push("### Gaps");

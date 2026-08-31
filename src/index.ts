@@ -111,14 +111,12 @@ async function resolveAuth(): Promise<ResolvedAuth> {
 /**
  * Resolves parent via option or wiki extract suggestion.
  *
- * @param topic - learning topic
  * @param summary - wiki summary
  * @param opts - CLI options
  * @param token - auth token
  * @returns parent choice
  */
 async function resolveParent(
-  topic: string,
   summary: NonNullable<WikiBucket["summary"]>,
   opts: LearnOptions,
   token: string,
@@ -279,7 +277,7 @@ function resolveDifficultyAndCount(
       count: parseInt(opts.questions, 10) || 30,
       difficulty: "advanced",
     };
-  const hasCustomCount = opts.questions !== "6" && opts.questions !== "10";
+  const hasCustomCount = opts.questions !== "6" && opts.questions !== "15";
   if (hasCustomCount) {
     const n = parseInt(opts.questions, 10);
     if (!Number.isNaN(n))
@@ -287,7 +285,7 @@ function resolveDifficultyAndCount(
   }
   if (readinessReady) return { count: 30, difficulty: "advanced" };
   if (explicit === "same" || !explicit)
-    return { count: 20, difficulty: "same" };
+    return { count: 15, difficulty: "same" };
   return { count: 10, difficulty: "basic" };
 }
 
@@ -373,10 +371,10 @@ async function createOrUpdateBlog(
  */
 function printBlogLink(id: string, title: string): void {
   const url = `https://sun.int.scarlettparker.co.uk/blog/${id}`;
-  console.log(chalk.cyan(`\nRead and review: ${url} — "${title}"`));
+  console.log(chalk.cyan(`\nRead and review: ${url} - "${title}"`));
   console.log(
     chalk.dim(
-      "Open the link to review before attempting again — knowledge builds on each pass.",
+      "Open the link to review before attempting again - knowledge builds on each pass.",
     ),
   );
 }
@@ -410,7 +408,7 @@ function presentRelatedOverview(
       ? r.extract.slice(0, 100).replace(/\n/g, " ")
       : "";
     console.log(
-      chalk.dim(`  ${idx}. ${r.title}${overview ? ` — ${overview}…` : ""}`),
+      chalk.dim(`  ${idx}. ${r.title}${overview ? ` - ${overview}…` : ""}`),
     );
     if (idx >= 8) break;
   }
@@ -466,7 +464,6 @@ async function runLearnSession(
   topic = topic.trim().replace(/#+$/, "").trim();
   const wiki = await scrapeWiki(topic, token);
   const parentChoice = await resolveParent(
-    topic,
     wiki.summary as NonNullable<WikiBucket["summary"]>,
     opts,
     token,
@@ -555,7 +552,7 @@ async function runLearnSession(
   if (!nextTopic) {
     console.log(
       chalk.dim(
-        "\nKeep reviewing the blog link above — knowledge builds with each pass.",
+        "\nKeep reviewing the blog link above - knowledge builds with each pass.",
       ),
     );
     return;
@@ -587,7 +584,7 @@ program
   .command("learn")
   .argument("<topic>", "topic to learn")
   .option("--parent <title>", "parent blog title")
-  .option("--questions <n>", "number of questions", "20")
+  .option("--questions <n>", "number of questions", "15")
   .option("--difficulty <level>", "difficulty: basic|same|advanced", "same")
   .option("--source <kind>", "source kind", "wikipedia")
   .option("--dry-run", "do not write blog")

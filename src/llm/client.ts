@@ -1,25 +1,60 @@
 import { loadConfig } from "../config.js";
 
 export type ChatMessage = {
+  /**
+   * Role.
+   */
   role: "system" | "user" | "assistant";
+  /**
+   * Content.
+   */
   content: string;
+};
+
+export type CallOptions = {
+  /**
+   * Reasoning effort.
+   */
+  effort?: "low" | "medium" | "high";
+  /**
+   * Verbosity.
+   */
+  verbosity?: "low" | "medium" | "high";
+  /**
+   * Max output tokens.
+   */
+  maxOutputTokens?: number;
 };
 
 /**
  * Calls LLM 1.2 via opencode zen/go responses (OpenAI-compat).
+ *
+ * @param messages - chat messages
+ * @param opts - reasoning and verbosity options
+ * @returns response text
  */
-export async function callMuseSpark(messages: ChatMessage[]): Promise<string> {
+export async function callMuseSpark(messages: ChatMessage[], opts?: CallOptions): Promise<string> {
   const config = loadConfig();
+  const effort = opts?.effort ?? config.reasoningEffort;
+  const verbosity = opts?.verbosity ?? config.verbosity;
+  const maxTokens = opts?.maxOutputTokens ?? config.maxOutputTokens;
+  const body: Record<string, unknown> = {
+    model: config.model,
+    input: messages.map((m) => ({ role: m.role, content: m.content })),
+  };
+  if (effort) {
+    (body as Record<string, unknown>).reasoning = { effort };
+    (body as Record<string, unknown>).reasoning_effort = effort;
+  }
+  if (verbosity) (body as Record<string, unknown>).text = { verbosity };
+  if (maxTokens) (body as Record<string, unknown>).max_output_tokens = maxTokens;
   const res = await fetch(config.openaiBaseUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${config.openaiApiKey}`,
     },
-    body: JSON.stringify({
-      model: config.model,
-      input: messages.map((m) => ({ role: m.role, content: m.content })),
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const text = await res.text();

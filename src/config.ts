@@ -1,5 +1,9 @@
 import "dotenv/config";
 
+export type EffortLevel = "low" | "medium" | "high";
+
+export type VerbosityLevel = "low" | "medium" | "high";
+
 export type LearnerConfig = {
   /**
    * GraphQL endpoint.
@@ -25,6 +29,34 @@ export type LearnerConfig = {
    * Model name.
    */
   model: string;
+  /**
+   * Default reasoning effort.
+   */
+  reasoningEffort: EffortLevel;
+  /**
+   * Fast reasoning effort for short calls.
+   */
+  fastReasoningEffort: EffortLevel;
+  /**
+   * Default verbosity.
+   */
+  verbosity?: VerbosityLevel;
+  /**
+   * Fast verbosity for short calls.
+   */
+  fastVerbosity: VerbosityLevel;
+  /**
+   * Default max output tokens.
+   */
+  maxOutputTokens?: number;
+  /**
+   * Fast max output tokens for assess.
+   */
+  assessMaxTokens: number;
+  /**
+   * Fast max output tokens for grade.
+   */
+  gradeMaxTokens: number;
 };
 
 /**
@@ -56,6 +88,13 @@ export function loadConfig(): LearnerConfig {
   if (!model) {
     throw new Error("Missing OPENAI_MODEL");
   }
+  const reasoningEffort = parseEffort(process.env.OPENAI_REASONING_EFFORT) ?? "medium";
+  const fastReasoningEffort = parseEffort(process.env.OPENAI_FAST_EFFORT) ?? "low";
+  const verbosity = parseVerbosity(process.env.OPENAI_VERBOSITY);
+  const fastVerbosity = parseVerbosity(process.env.OPENAI_FAST_VERBOSITY) ?? "low";
+  const maxOutputTokens = parseIntSafe(process.env.OPENAI_MAX_OUTPUT_TOKENS);
+  const assessMaxTokens = parseIntSafe(process.env.OPENAI_ASSESS_MAX_TOKENS) ?? 128;
+  const gradeMaxTokens = parseIntSafe(process.env.OPENAI_GRADE_MAX_TOKENS) ?? 16;
   return {
     graphqlEndpoint,
     clientId,
@@ -63,5 +102,46 @@ export function loadConfig(): LearnerConfig {
     openaiApiKey,
     openaiBaseUrl,
     model,
+    reasoningEffort,
+    fastReasoningEffort,
+    verbosity,
+    fastVerbosity,
+    maxOutputTokens,
+    assessMaxTokens,
+    gradeMaxTokens,
   };
+}
+
+/**
+ * Parses effort level.
+ *
+ * @param value - raw env value
+ * @returns effort level or undefined
+ */
+function parseEffort(value: string | undefined): EffortLevel | undefined {
+  if (value === "low" || value === "medium" || value === "high") return value;
+  return undefined;
+}
+
+/**
+ * Parses verbosity level.
+ *
+ * @param value - raw env value
+ * @returns verbosity or undefined
+ */
+function parseVerbosity(value: string | undefined): VerbosityLevel | undefined {
+  if (value === "low" || value === "medium" || value === "high") return value;
+  return undefined;
+}
+
+/**
+ * Parses int safely.
+ *
+ * @param value - raw env value
+ * @returns number or undefined
+ */
+function parseIntSafe(value: string | undefined): number | undefined {
+  if (!value) return undefined;
+  const n = parseInt(value, 10);
+  return Number.isNaN(n) ? undefined : n;
 }
