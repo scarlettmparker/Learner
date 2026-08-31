@@ -144,7 +144,7 @@ export async function fetchWikipediaPage(
   );
   const text = data.wikiQueries?.wikipediaPage;
   if (!text || !text.trim()) return null;
-  return text.length > 12000 ? text.slice(0, 12000) : text;
+  return text;
 }
 
 /**

@@ -80,15 +80,18 @@ function reportResult(isCorrect: boolean, question: QuizQuestion): void {
 
 /**
  * Runs interactive quiz loop.
+ *
+ * @param questions - questions to ask
+ * @returns results
  */
-export async function runQuiz(questions: QuizQuestion[], token: string): Promise<QuizRunResult> {
+export async function runQuiz(questions: QuizQuestion[]): Promise<QuizRunResult> {
   let correct = 0;
   const answers: QuizAnswer[] = [];
   for (let i = 0; i < questions.length; i++) {
     const q = questions[i];
     printQuestion(q, i);
     const answer = await promptAnswer();
-    const result = await gradeAnswer(q, answer, token);
+    const result = await gradeAnswer(q, answer);
     const isCorrect = result.correct;
     if (isCorrect) correct++;
     reportResult(isCorrect, q);

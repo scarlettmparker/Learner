@@ -23,6 +23,7 @@ import {
   pickParentInteractive,
   updateBlog,
 } from "./sun.js";
+import { chunkPage, sampleChunksForQuiz } from "./quiz/chunk.js";
 import { withThinking } from "./ui/thinking.js";
 import { generateQuiz } from "./quiz/generate.js";
 import { buildMarkdown } from "./quiz/markdown.js";
@@ -473,6 +474,10 @@ async function runLearnSession(
   const fullPageEnriched = [wiki.fullPage, relatedEnrichment]
     .filter(Boolean)
     .join("\n\n");
+  const chunks = fullPageEnriched ? chunkPage(fullPageEnriched) : [];
+  const sampledForQuiz = chunks.length
+    ? sampleChunksForQuiz(chunks, blogCtx.priorContext, 3)
+    : fullPageEnriched;
   let readinessReady = false;
   if (blogCtx.existingForContext) {
     const { assessReadiness } = await import("./quiz/revisit.js");
@@ -489,25 +494,22 @@ async function runLearnSession(
     readinessReady,
     opts.difficulty,
   );
-  const combinedPrior = `${blogCtx.priorContext}\n${fullPageEnriched ? `Enriched excerpt: ${fullPageEnriched.slice(0, 2000)}` : ""}`;
+  const combinedPrior = blogCtx.priorContext;
   const quiz = await withThinking(
     `Thinking - generating quiz (${numQuestions} questions, ${difficulty})...`,
     () =>
-      generateQuiz(
-        {
-          topic,
-          summary: wiki.summary as NonNullable<WikiBucket["summary"]>,
-          related: wiki.related,
-          priorContext: combinedPrior,
-          numQuestions,
-          fullPage: fullPageEnriched || wiki.fullPage,
-          difficulty,
-          mastery: readinessReady,
-        },
-        token,
-      ),
+      generateQuiz({
+        topic,
+        summary: wiki.summary as NonNullable<WikiBucket["summary"]>,
+        related: wiki.related,
+        priorContext: combinedPrior,
+        numQuestions,
+        fullPage: sampledForQuiz || wiki.fullPage,
+        difficulty,
+        mastery: readinessReady,
+      }),
   );
-  const { answers, correct, gaps } = await runQuiz(quiz.questions, token);
+  const { answers, correct, gaps } = await runQuiz(quiz.questions);
   console.log(chalk.bold(`\nScore: ${correct}/${quiz.questions.length}`));
   if (opts.dryRun) {
     console.log(chalk.yellow("Dry run, not writing blog"));

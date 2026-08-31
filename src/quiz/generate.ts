@@ -122,9 +122,10 @@ When full page excerpt is provided, ask detailed questions from the full page sc
  */
 function buildUserPrompt(args: GenerateArgs): ChatMessage {
   const pagePart = args.fullPage
-    ? `Full page excerpt (plaintext, up to 12000 chars, use for detailed questions):\n${args.fullPage.slice(0, 8000)}\n`
+    ? `Full page excerpt (chunked, spans entire page):\n${args.fullPage}\n`
     : "";
   const difficulty = args.difficulty ?? (args.mastery ? "advanced" : "same");
+  const isAdvanced = difficulty === "advanced";
   return {
     role: "user",
     content: `Topic: ${args.topic}
@@ -134,17 +135,24 @@ ${pagePart}PageUrl: ${args.summary.pageUrl}
 Prior KNOWLEDGE titles: ${args.priorContext || "(none)"}
 Related topics: ${args.related.map((r) => r.title).join(", ") || "(none)"}
 Difficulty: ${difficulty}
-Generate ${args.numQuestions} questions: ~33% mcq, ~33% fill, ~33% short (balanced). Return markdown only.`,
+Generate ${args.numQuestions} questions${isAdvanced ? ": 50% short, 25% mcq, 25% fill" : ": ~33% mcq, ~33% fill, ~33% short"}, interleaved (mcq, fill, short, repeat, never 3 of same type in a row).${isAdvanced ? " For advanced, at least half must be synthesis and application: give a new maxim or scenario and ask what the categorical imperative would say, compare formulations, ask why a maxim fails universalization. Don't ask recall like \"central concept\". Never put the answer in parentheses inside an mcq option, and all 4 mcq options must be same type as the answer (all years if answer is a year)." : ""} Return markdown only.`,
   };
 }
 
 /**
- * Generates quiz via Muse Spark with anti-ai-slop constraints.
+ * Shuffles array in place, Fisher-Yates.
  *
- * @param props - generation args
- * @param _token - unused auth token
- * @returns quiz
+ * @param arr - array to shuffle
  */
+function shuffleInPlace<T>(arr: T[]): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+}
+
 /**
  * Drops overlapping questions locally, no LLM retry.
  *
@@ -203,10 +211,70 @@ function dedupQuiz(quiz: Quiz): Quiz {
   return { questions: kept };
 }
 
-export async function generateQuiz(
-  props: GenerateArgs,
-  _token: string,
-): Promise<Quiz> {
+/**
+ * Strips parenthetical that leaks the answer, e.g. "The 18th century (1785)".
+ *
+ * @param options - mcq options
+ * @param answer - correct answer
+ * @returns sanitized options
+ */
+function sanitizeOptions(options: string[], answer: string): string[] {
+  return options.map((opt) => {
+    const trimmed = opt.trim();
+    if (trimmed.includes("(") && trimmed.includes(")")) {
+      const inside = trimmed.slice(trimmed.indexOf("(") + 1, trimmed.indexOf(")"));
+      if (inside.includes(answer.trim()) || answer.trim().includes(inside.trim())) {
+        return trimmed.replace(/\s*\(.*?\)\s*/g, "").trim();
+      }
+      if (/\b\d{4}\b/.test(inside) && /\b\d{4}\b/.test(answer)) {
+        return trimmed.replace(/\s*\(.*?\)\s*/g, "").trim();
+      }
+    }
+    return trimmed;
+  });
+}
+
+/**
+ * Shuffles mcq options and interleaves types programmatically.
+ *
+ * @param quiz - deduped quiz
+ * @returns shuffled quiz
+ */
+function shuffleAndInterleave(quiz: Quiz): Quiz {
+  for (const q of quiz.questions) {
+    if (q.type === "mcq" && q.options && q.options.length === 4) {
+      q.options = sanitizeOptions(q.options, q.answer);
+      shuffleInPlace(q.options);
+    }
+  }
+  const shuffled = [...quiz.questions];
+  shuffleInPlace(shuffled);
+  let attempts = 0;
+  while (attempts < 10) {
+    let badRun = false;
+    let run = 1;
+    for (let i = 1; i < shuffled.length; i++) {
+      if (shuffled[i].type === shuffled[i - 1].type) run++;
+      else run = 1;
+      if (run > 2) {
+        badRun = true;
+        break;
+      }
+    }
+    if (!badRun) break;
+    shuffleInPlace(shuffled);
+    attempts++;
+  }
+  return { questions: shuffled };
+}
+
+/**
+ * Generates quiz from LLM markdown then programmatically fixes variety.
+ *
+ * @param props - generation args
+ * @returns quiz
+ */
+export async function generateQuiz(props: GenerateArgs): Promise<Quiz> {
   const args = props;
   const system = buildSystemPrompt();
   const user = buildUserPrompt(args);
@@ -217,7 +285,10 @@ export async function generateQuiz(
     maxOutputTokens: config.maxOutputTokens,
   });
   const parsed = parseMarkdownToQuiz(text, args);
-  if (parsed) return dedupQuiz(parsed);
+  if (parsed) {
+    const deduped = dedupQuiz(parsed);
+    return shuffleAndInterleave(deduped);
+  }
   throw new Error(
     `Failed to generate quiz - response was not markdown: ${text.slice(0, 600)}`,
   );
@@ -308,11 +379,14 @@ function describeQuizIssues(quiz: Quiz): string {
 
 /**
  * Grades an answer via exact + letter mapping + judge for short.
+ *
+ * @param question - question to grade
+ * @param myAnswer - learner answer
+ * @returns whether correct
  */
 export async function gradeAnswer(
   question: QuizQuestion,
   myAnswer: string,
-  _token: string,
 ): Promise<{ correct: boolean }> {
   const norm = (s: string) => s.trim().toLowerCase();
   if (question.type === "mcq") {
