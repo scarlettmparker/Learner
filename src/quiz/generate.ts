@@ -109,6 +109,7 @@ Explain: wiki span
 - Every question must test a different fact and a different span: no two share the same normalized answer (lowercase, strip punctuation, singularise) or the same quoted span. Answers across the quiz must be distinct after lowercasing and singularising.
 - Founder or origin questions (e.g., who introduced a concept) allowed at most once per quiz, and only if not already stated in prior stems; don't leak later answers in earlier stems or options.
 - Answer lines must be bare phrase only, never "A. phrase" or "B. phrase" - the program shuffles and checks the phrase itself, a prefix breaks grading.
+- Never include the answer in the stem. The stem, and any list inside it, must not contain the answer as a whole word or phrase, case-insensitive, singular and plural, and split hyphenated compounds. Strip the blank ____ and hints like [year] or [term] before checking. If the answer has multiple words, the stem must not contain that exact phrase and must not contain any content word from the answer. If a sentence already states the answer, rephrase the stem to remove it or pick a different sentence. Code will drop leaked questions and force regeneration, so you will lose count if you leak.
 - Follow anti-ai-slop: avoid banned words (delve, tapestry, vibrant, pivotal, crucial, intricate, meticulous, comprehensive, foster, leverage, utilize, seamless, robust, groundbreaking, transformative), mix sentence lengths, no rule-of-three, active voice, no em dashes at all.
 
 STAY ON TOPIC: All stems, answers, and Explains must be directly answerable from the Wiki extract and Full page excerpt for the Topic and Wiki title above. Do not stray to generic biography, broad movements, or other background unless that text is inside the excerpt and directly illustrates the Topic. Related topics are hints only, filter to those whose extract mentions the Topic. If you stray, you have failed.
@@ -141,7 +142,7 @@ Prior KNOWLEDGE titles: ${args.priorContext || "(none)"}
 Related topics: ${args.related.map((r) => r.title).join(", ") || "(none)"}
 Difficulty: ${difficulty}
 Focus: Every question must be directly about "${args.topic}" / "${args.summary.title}" and answerable from the Wiki extract or Full page excerpt above. Do not stray to generic biography or broad background unless it directly illustrates the Topic. A question about a broad movement when the Topic is a specific concept is straying. Keep all questions tightly on the Topic.
-Generate ${args.numQuestions} questions minimum, overshoot to ${overshoot} distinct questions so dedup still leaves ${args.numQuestions}. Count Q1 to Q${overshoot} and do not stop early. You MUST try to reach the overshoot; if you would normally stop at 8, keep going, use different spans, dates, and formulations directly about the Topic.${isAdvanced ? " Mix: 50% short, 25% mcq, 25% fill" : " Mix: ~33% mcq, ~33% fill, ~33% short"}, interleaved (mcq, fill, short, repeat, never 3 of same type in a row).${isAdvanced ? " For advanced, at least half must be synthesis and application: give a new scenario and ask what the principle would say, compare formulations, ask why a maxim fails. Don't stay on simple recall. Never put the answer in parentheses inside an mcq option, and all 4 mcq options must be same type as the answer (all years if answer is a year)." : " For default/basic, keep the mix but really push to the overshoot; use synthesis and dating too where possible, just lighter and still on Topic."} Return markdown only. Answer must be bare phrase, never prefixed with "A. " or "B. " - just the phrase.`,
+Generate ${args.numQuestions} questions minimum, overshoot to ${overshoot} distinct questions so dedup still leaves ${args.numQuestions}. Count Q1 to Q${overshoot} and do not stop early. You MUST try to reach the overshoot; if you would normally stop at 8, keep going, use different spans, dates, and formulations directly about the Topic.${isAdvanced ? " Mix: 50% short, 25% mcq, 25% fill" : " Mix: ~33% mcq, ~33% fill, ~33% short"}, interleaved (mcq, fill, short, repeat, never 3 of same type in a row).${isAdvanced ? " For advanced, at least half must be synthesis and application: give a new scenario and ask what the principle would say, compare formulations, ask why a maxim fails. Don't stay on simple recall. Never put the answer in parentheses inside an mcq option, and all 4 mcq options must be same type as the answer (all years if answer is a year)." : " For default/basic, keep the mix but really push to the overshoot; use synthesis and dating too where possible, just lighter and still on Topic."} Return markdown only. Answer must be bare phrase, never prefixed with "A. " or "B. " - just the phrase. Also verify no stem contains its own answer word or phrase, rephrase any leaked stem to remove the term.`,
   };
 }
 
@@ -168,6 +169,7 @@ function shuffleInPlace<T>(arr: T[]): void {
 function dedupQuiz(quiz: Quiz): Quiz {
   const kept: QuizQuestion[] = [];
   for (const q of quiz.questions) {
+    if (stemContainsAnswer(q.stem, q.answer)) continue;
     let duplicate = false;
     for (const k of kept) {
       if (k.answer.toLowerCase().trim() === q.answer.toLowerCase().trim()) {
@@ -247,6 +249,46 @@ function sanitizeOptions(options: string[], answer: string): string[] {
 }
 
 /**
+ * Checks if stem contains its own answer.
+ *
+ * @param stem - question stem
+ * @param answer - correct answer
+ * @returns true if stem leaks answer
+ */
+function stemContainsAnswer(stem: string, answer: string): boolean {
+  const cleanStem = stem
+    .replace(/_{2,}/g, " ")
+    .replace(/\s*\[.*?\]/g, " ")
+    .toLowerCase();
+  const cleanAnswer = answer.toLowerCase().trim();
+  if (!cleanAnswer) return false;
+  const norm = (s: string): string =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim()
+      .replace(/\b(\w+)s\b/g, "$1");
+  const stemNorm = ` ${norm(cleanStem)} `;
+  const answerNorm = norm(cleanAnswer);
+  if (!answerNorm) return false;
+  if (answerNorm.length >= 3 && stemNorm.includes(` ${answerNorm} `)) {
+    return true;
+  }
+  const answerWords = answerNorm.split(/\s+/).filter((w) => w.length >= 3);
+  const stemWords = new Set(stemNorm.trim().split(/\s+/));
+  for (const w of answerWords) {
+    const singular = w.endsWith("s") && w.length > 3 ? w.slice(0, -1) : w;
+    if (stemWords.has(w) || stemWords.has(singular)) return true;
+    for (const sw of stemWords) {
+      const swSingular =
+        sw.endsWith("s") && sw.length > 3 ? sw.slice(0, -1) : sw;
+      if (swSingular === singular) return true;
+    }
+  }
+  return false;
+}
+
+/**
  * Shuffles mcq options and interleaves types programmatically.
  *
  * @param quiz - deduped quiz
@@ -306,6 +348,9 @@ export async function generateQuiz(props: GenerateArgs): Promise<Quiz> {
     throw new Error(
       `Failed to generate quiz - response was not markdown: ${text.slice(0, 600)}`,
     );
+  const leakedInitial = parsed.questions.filter((q) =>
+    stemContainsAnswer(q.stem, q.answer),
+  ).length;
   let deduped = dedupQuiz(parsed);
   const floor = args.difficulty === "advanced" ? 15 : args.numQuestions;
   let attempts = 0;
@@ -319,9 +364,13 @@ export async function generateQuiz(props: GenerateArgs): Promise<Quiz> {
     const remaining = need > 0 ? need : floor - deduped.questions.length;
     const existingStems = deduped.questions.map((q) => q.stem).join("\n");
     const existingAnswers = deduped.questions.map((q) => q.answer).join(", ");
+    const leakNote =
+      leakedInitial > 0
+        ? ` ${leakedInitial} leaked because the stem contained its own answer and were dropped. Never include the answer word or phrase in the stem or in a list before the blank.`
+        : "";
     const supplementUser: ChatMessage = {
       role: "user",
-      content: `You returned ${deduped.questions.length}/${args.numQuestions} (floor ${floor} for advanced). Generate ${remaining} MORE distinct questions to reach ${args.numQuestions}. Do not repeat any existing stem/answer/Explain span.\nExisting stems:\n${existingStems}\nExisting answers: ${existingAnswers}\nUse different sections, dates, relations, and examples from the full page. Same format Q${deduped.questions.length + 1}.., same difficulty ${args.difficulty}, same mix. Return markdown only.`,
+      content: `You returned ${deduped.questions.length}/${args.numQuestions} (floor ${floor} for advanced).${leakNote} Generate ${remaining} MORE distinct questions to reach ${args.numQuestions}. Do not repeat any existing stem/answer/Explain span and never let a stem contain its own answer.\nExisting stems:\n${existingStems}\nExisting answers: ${existingAnswers}\nUse different sections, dates, relations, and examples from the full page. Same format Q${deduped.questions.length + 1}.., same difficulty ${args.difficulty}, same mix. Return markdown only.`,
     };
     const extraText = await callLLM([system, supplementUser], {
       effort: config.reasoningEffort,
@@ -371,6 +420,9 @@ function hasDistinctOptions(quiz: Quiz): boolean {
  * @returns true if valid
  */
 function hasDistinctAnswersAndStems(quiz: Quiz): boolean {
+  for (const q of quiz.questions) {
+    if (stemContainsAnswer(q.stem, q.answer)) return false;
+  }
   const norm = (s: string) =>
     s
       .toLowerCase()
@@ -400,32 +452,6 @@ function hasDistinctAnswersAndStems(quiz: Quiz): boolean {
   ).length;
   if (founderCount > 1) return false;
   return true;
-}
-
-/**
- * Describes duplicate/leakage issues for retry prompt.
- *
- * @param quiz - parsed quiz with issues
- * @returns issue description
- */
-function describeQuizIssues(quiz: Quiz): string {
-  const norm = (s: string) =>
-    s
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
-  const seen = new Map<string, number>();
-  const issues: string[] = [];
-  quiz.questions.forEach((q, idx) => {
-    const n = norm(q.answer);
-    const prev = seen.get(n);
-    if (prev !== undefined)
-      issues.push(`Q${prev + 1} and Q${idx + 1} share answer "${q.answer}"`);
-    else seen.set(n, idx);
-  });
-  return (
-    issues.join("; ") || "duplicate stems/answers or cross-question leakage"
-  );
 }
 
 /**

@@ -15,6 +15,7 @@ Must load `anti-ai-slop-writing` `references/banned-words.md` before writing. Ke
 - Same `Explain` span. If two Explains share more than a handful of words (roughly six in a row or Jaccard ≥0.6), they're the same source. Keep the first, drop the second.
 - Same normalized answer after lowercasing and singularising. "motivation" vs "motivations" is the same.
 - Stem that contains another question's answer. If you asked "who introduced concept X" then a later stem says "the introduction of concept X", that leaks.
+- Stem that contains its own answer. If the stem lists the answer among alternatives and then asks for it, or repeats the answer as a whole word or phrase before the blank, that leaks. Check case-insensitive, singular and plural, and split hyphenated compounds. The blank must be the only place the answer appears.
 
 ## How to fix, fast, no LLM retry
 
