@@ -103,10 +103,10 @@ Explain: wiki span
 - Each mcq: 4 distinct full phrases, randomize correct position across A-D, distractors from extract's key concepts, deduplicate stem/options (no option repeats stem substring >5 chars), never placeholders like A/B/C/D or Not ...1.
 - Keep stems and options close to the wiki extract; explanations must quote a short wiki span only (no PageUrl, source is at top).
 - When difficulty advanced/mastery true, use synthesis across sections not just definitions. You must get harder as prior attempts show mastery -add synthesis, application, comparison, dating, relation questions. If you stay on definitions the learner stalls.
-- Fill blanks must say what kind of answer you expect when it could be vague. Don't write "Kant introduced the categorical imperative in ____." when you want 1785 -write "Kant introduced the categorical imperative in ____ [year]." or "In what year did Kant introduce..." Same for titles, names, places: "in ____ [work]" or "the book ____ [title]". The blank line itself doesn't tell the learner if you want a year, a name, or a title, so add [year], [person], [work], [place] or phrase it as a clear question instead of leaving it bare.
-- Don't carve two fills out of one sentence. The Q8/Q9 maxim/universal pair is exactly what not to do -both Explain lines quoted "Act only according to that maxim whereby you can... universal law" and only the blank moved. That's a repeat, even though the blank word differs. If you use a sentence for one Explain, pick a different sentence or a different paragraph for the next. Explain spans shouldn't share more than a handful of words; stems shouldn't be the same sentence with a different word blanked.
+- Fill blanks must say what kind of answer you expect when it could be vague. Don't write "The treaty was signed in ____." when you want 1919 -write "The treaty was signed in ____ [year]." or "In what year was the treaty signed?" Same for titles, names, places: "in ____ [work]" or "the book ____ [title]". The blank itself doesn't tell the learner if you want a year, a name, or a title, so add [year], [person], [work], [place] or phrase it as a clear question instead of leaving it bare. Every fill must be grammatically correct as an intentional fragment. Read the stem with the answer inserted; it must sound right. Don't write "would ____ [activity]" and expect a gerund like "undermining the process" — that reads "would undermining" and is wrong. Write "would ____ [verb]" for the base form or "would result in ____ [noun phrase]" for the gerund.
+- Don't carve two fills out of one sentence. A common failure is blanking two words from the same source sentence — both Explains quote that one sentence and only the blank moves. That's a repeat, even though the blank word differs. If you use a sentence for one Explain, pick a different sentence or a different paragraph for the next. Explain spans shouldn't share more than a handful of words; stems shouldn't be the same sentence with a different word blanked.
 - Every question must test a different fact and a different span: no two share the same normalized answer (lowercase, strip punctuation, singularise) or the same quoted span. Answers across the quiz must be distinct after lowercasing and singularising.
-- Founder/thinker questions (e.g., which thinker created ...) allowed at most once per quiz, and only if not already stated in prior stems; don't leak later answers in earlier stems/options. Earlier questions mustn't name the entity that is the answer to a later one.
+- Founder or origin questions (e.g., who introduced a concept) allowed at most once per quiz, and only if not already stated in prior stems; don't leak later answers in earlier stems or options.
 - Follow anti-ai-slop: avoid banned words (delve, tapestry, vibrant, pivotal, crucial, intricate, meticulous, comprehensive, foster, leverage, utilize, seamless, robust, groundbreaking, transformative), mix sentence lengths, no rule-of-three, active voice, ≤1 em dash per 500 words.
 
 Prior KNOWLEDGE context helps you avoid repeating what the user already knows.
@@ -413,11 +413,11 @@ export async function gradeAnswer(
   const system: ChatMessage = {
     role: "system",
     content:
-      "You judge short answers. Return JSON {correct: boolean} only. Spend minimal thinking, no chain-of-thought.",
+      "You judge short answers. Read anti-ai-slop-writing references/banned-words.md and be lenient. Return JSON {correct: boolean} only. Accept paraphrase if core idea matches, ignore articles, hedging, order, or synonyms. \"You can never trust a promise\" and \"Promises lose all credibility...\" are the same idea for the farmer maxim. Mark correct when the learner captures the universalization collapse, even if wording differs. Spend minimal thinking, no chain-of-thought.",
   };
   const user: ChatMessage = {
     role: "user",
-    content: `Question: ${question.stem}\nCorrect: ${question.answer}\nMy: ${myAnswer}\nJudge:`,
+    content: `Question: ${question.stem}\nCorrect: ${question.answer}\nMy: ${myAnswer}\nJudge leniently per skill:`,
   };
   try {
     const config = loadConfig();

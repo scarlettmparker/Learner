@@ -451,6 +451,23 @@ async function promptRecurring(
 }
 
 /**
+ * Prompts for difficulty at start, defaults to same.
+ *
+ * @returns chosen difficulty
+ */
+async function promptDifficultyAtStart(): Promise<string> {
+  const { difficulty } = await promptInput<{ difficulty: string }>({
+    type: "select",
+    name: "difficulty",
+    message: "How challenging should this quiz be?",
+    choices: ["same level", "more advanced", "more basic"],
+  });
+  if (difficulty === "more advanced") return "advanced";
+  if (difficulty === "more basic") return "basic";
+  return "same";
+}
+
+/**
  * Runs a single learn session for a topic.
  *
  * @param topic - topic to learn
@@ -463,6 +480,11 @@ async function runLearnSession(
   token: string,
 ): Promise<void> {
   topic = topic.trim().replace(/#+$/, "").trim();
+  let startDifficulty = opts.difficulty;
+  const hasExplicitFlag = process.argv.includes("--difficulty");
+  if (!hasExplicitFlag) {
+    startDifficulty = await promptDifficultyAtStart();
+  }
   const wiki = await scrapeWiki(topic, token);
   const parentChoice = await resolveParent(
     wiki.summary as NonNullable<WikiBucket["summary"]>,
@@ -490,9 +512,9 @@ async function runLearnSession(
     readinessReady = readiness.ready;
   }
   const { count: numQuestions, difficulty } = resolveDifficultyAndCount(
-    opts,
+    { ...opts, difficulty: startDifficulty },
     readinessReady,
-    opts.difficulty,
+    startDifficulty,
   );
   const combinedPrior = blogCtx.priorContext;
   const quiz = await withThinking(
