@@ -23,7 +23,6 @@ npx sun-learn review
 npx sun-learn config
 ```
 
-```bash
-# Sun backend (after schema changes)
-npm --prefix ../Sun run graphql:generate
+```
+
 ```
