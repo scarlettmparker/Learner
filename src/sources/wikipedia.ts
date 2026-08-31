@@ -61,6 +61,16 @@ const WikipediaPageDocument = parse(
 );
 
 /**
+ * Encodes wiki URL parens for markdown safety.
+ *
+ * @param url - raw wiki URL
+ * @returns encoded URL with ( and ) as %28 %29
+ */
+function encodeWikiUrl(url: string): string {
+  return url.replace(/\(/g, "%28").replace(/\)/g, "%29");
+}
+
+/**
  * Maps raw summary to WikiSummary.
  *
  * @param raw - raw summary fields
@@ -80,9 +90,9 @@ function mapSummary(
   return {
     title: raw.title,
     extract: raw.extract,
-    pageUrl:
-      raw.pageUrl ??
-      `https://en.wikipedia.org/wiki/${encodeURIComponent(fallbackTitle)}`,
+    pageUrl: raw.pageUrl
+      ? encodeWikiUrl(raw.pageUrl)
+      : `https://en.wikipedia.org/wiki/${encodeURIComponent(fallbackTitle)}`,
     thumbnailUrl: raw.thumbnailUrl ?? null,
   };
 }
@@ -161,7 +171,7 @@ export async function fetchRelatedTopics(
   );
   return (data.wikiQueries?.wikipediaRelatedTopics ?? []).map((r) => ({
     title: r.title,
-    pageUrl: r.pageUrl,
+    pageUrl: encodeWikiUrl(r.pageUrl),
     extract: r.extract ?? null,
   }));
 }

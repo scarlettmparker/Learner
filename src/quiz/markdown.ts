@@ -81,6 +81,26 @@ function buildResultCell(
 }
 
 /**
+ * Escapes markdown link title brackets.
+ *
+ * @param title - wiki title
+ * @returns escaped title safe inside [title]
+ */
+function escapeLinkTitle(title: string): string {
+  return title.replace(/\\/g, "\\\\").replace(/\]/g, "\\]");
+}
+
+/**
+ * Encodes wiki URL parens for markdown safety.
+ *
+ * @param url - raw wiki URL
+ * @returns encoded URL
+ */
+function encodeWikiUrl(url: string): string {
+  return url.replace(/\(/g, "%28").replace(/\)/g, "%29");
+}
+
+/**
  * Builds markdown for child blog, mostly verbatim answers + wiki, minimal LLM.
  */
 export function buildMarkdown(
@@ -96,7 +116,9 @@ export function buildMarkdown(
   const lines: string[] = [];
   if (args.mastery) lines.push("> Mastery detected - expanded to advanced material");
   if (includeResearch) {
-    lines.push(`Source: [${args.summary.title}](${args.pageUrl})`);
+    const safeTitle = escapeLinkTitle(args.summary.title);
+    const safeUrl = encodeWikiUrl(args.pageUrl);
+    lines.push(`Source: [${safeTitle}](${safeUrl})`);
     lines.push("### What was researched");
     lines.push(`> ${args.summary.extract.replace(/\s+/g, " ").trim()}`);
   }
