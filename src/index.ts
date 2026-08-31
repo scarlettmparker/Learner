@@ -324,7 +324,7 @@ async function createOrUpdateBlog(
 ): Promise<string> {
   const existing = await findExistingChildByTopic(
     parentChoice.id,
-    topic,
+    summary.title,
     token,
   );
   if (existing) {
@@ -333,7 +333,7 @@ async function createOrUpdateBlog(
         `Found existing "${existing.title}" - updating with new attempt...`,
       ),
     );
-    const dateHeader = `\n---\n### ${formatTitleWithDate(topic)}\n`;
+    const dateHeader = `\n---\n### ${formatTitleWithDate(summary.title)}\n`;
     const newSection = buildMarkdown(
       {
         topic,
@@ -351,7 +351,7 @@ async function createOrUpdateBlog(
     const newId = await updateBlog(existing.id, updatedContent, token);
     return newId;
   }
-  const titleWithDate = formatTitleWithDate(topic);
+  const titleWithDate = formatTitleWithDate(summary.title);
   const markdown = buildMarkdown(
     {
       topic,
@@ -473,7 +473,7 @@ async function promptDifficultyAtStart(): Promise<string> {
     type: "select",
     name: "difficulty",
     message: "How challenging should this quiz be?",
-    choices: ["same level", "more advanced", "more basic"],
+    choices: ["default", "more advanced", "more basic"],
   });
   if (difficulty === "more advanced") return "advanced";
   if (difficulty === "more basic") return "basic";
@@ -499,12 +499,13 @@ async function runLearnSession(
     startDifficulty = await promptDifficultyAtStart();
   }
   const wiki = await scrapeWiki(topic, token);
+  const normalizedTopic = (wiki.summary as NonNullable<WikiBucket["summary"]>).title;
   const parentChoice = await resolveParent(
     wiki.summary as NonNullable<WikiBucket["summary"]>,
     opts,
     token,
   );
-  const blogCtx = await gatherBlogContext(topic, parentChoice, token);
+  const blogCtx = await gatherBlogContext(normalizedTopic, parentChoice, token);
   const relatedEnrichment = await scrapeRelatedPages(wiki.related, token);
   const fullPageEnriched = [wiki.fullPage, relatedEnrichment]
     .filter(Boolean)
@@ -534,7 +535,7 @@ async function runLearnSession(
     `Thinking - generating quiz (${numQuestions} questions, ${difficulty})...`,
     () =>
       generateQuiz({
-        topic,
+        topic: normalizedTopic,
         summary: wiki.summary as NonNullable<WikiBucket["summary"]>,
         related: wiki.related,
         priorContext: combinedPrior,
@@ -552,7 +553,7 @@ async function runLearnSession(
     console.log(
       buildMarkdown(
         {
-          topic,
+          topic: normalizedTopic,
           summary: wiki.summary as NonNullable<WikiBucket["summary"]>,
           fullPage: fullPageEnriched || wiki.fullPage,
           answers,
@@ -567,7 +568,7 @@ async function runLearnSession(
     return;
   }
   const newId = await createOrUpdateBlog(
-    topic,
+    normalizedTopic,
     parentChoice,
     wiki.summary as NonNullable<WikiBucket["summary"]>,
     answers,
@@ -580,7 +581,7 @@ async function runLearnSession(
   const isUpdate = Boolean(blogCtx.existingForContext);
   const displayTitle = isUpdate
     ? (blogCtx.existingForContext as { title: string }).title
-    : formatTitleWithDate(topic);
+    : formatTitleWithDate(normalizedTopic);
   console.log(
     chalk.green(
       `\n${isUpdate ? "Updated" : "Created"} blog "${displayTitle}" -> /blog/${newId}`,
