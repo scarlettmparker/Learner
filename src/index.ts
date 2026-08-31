@@ -272,22 +272,22 @@ function resolveDifficultyAndCount(
 ): { count: number; difficulty: "basic" | "same" | "advanced" } {
   const explicit = (difficultyOpt ?? opts.difficulty ?? "").toLowerCase();
   if (explicit === "basic")
-    return { count: parseInt(opts.questions, 10) || 10, difficulty: "basic" };
+    return { count: parseInt(opts.questions, 10) || 5, difficulty: "basic" };
   if (explicit === "advanced")
     return {
-      count: parseInt(opts.questions, 10) || 30,
+      count: parseInt(opts.questions, 10) || 20,
       difficulty: "advanced",
     };
-  const hasCustomCount = opts.questions !== "6" && opts.questions !== "15";
+  const hasCustomCount = opts.questions !== "6" && opts.questions !== "15" && opts.questions !== "10" && opts.questions !== "5";
   if (hasCustomCount) {
     const n = parseInt(opts.questions, 10);
     if (!Number.isNaN(n))
       return { count: n, difficulty: readinessReady ? "advanced" : "same" };
   }
-  if (readinessReady) return { count: 30, difficulty: "advanced" };
+  if (readinessReady) return { count: 20, difficulty: "advanced" };
   if (explicit === "same" || !explicit)
-    return { count: 15, difficulty: "same" };
-  return { count: 10, difficulty: "basic" };
+    return { count: 10, difficulty: "same" };
+  return { count: 5, difficulty: "basic" };
 }
 
 /**
@@ -608,7 +608,7 @@ program
   .command("learn")
   .argument("<topic>", "topic to learn")
   .option("--parent <title>", "parent blog title")
-  .option("--questions <n>", "number of questions", "15")
+  .option("--questions <n>", "number of questions", "10")
   .option("--difficulty <level>", "difficulty: basic|same|advanced", "same")
   .option("--source <kind>", "source kind", "wikipedia")
   .option("--dry-run", "do not write blog")

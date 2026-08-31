@@ -109,8 +109,12 @@ function parseSingleBlock(
       const optionText = trimmed.replace(/^[A-D]\.\s+/, "").trim();
       options.push(optionText);
     } else if (/^Answer:\s*/i.test(trimmed)) {
-      // Answer line: "Answer: full phrase"
-      answer = trimmed.replace(/^Answer:\s*/i, "").trim();
+      answer = trimmed
+        .replace(/^Answer:\s*/i, "")
+        .replace(/^[A-D][\.\)]\s*/i, "")
+        .replace(/^["']|["']$/g, "")
+        .trim();
+      answer = answer.replace(/^\s*[A-D]\s*[\.\)]\s*/i, "").trim();
     } else if (/^Explain:\s*/i.test(trimmed)) {
       // Explanation line: "Explain: wiki span"
       explanation = trimmed.replace(/^Explain:\s*/i, "").trim();
@@ -178,7 +182,10 @@ function parseRawBlocks(rawBlocks: string[], args: GenerateArgs): Quiz | null {
 
     const ansMatch = block.match(/^Answer:\s*(.+)$/m);
     const expMatch = block.match(/^Explain:\s*(.+)$/m);
-    const answer = ansMatch?.[1].trim();
+    let answer = ansMatch?.[1].trim();
+    if (answer) {
+      answer = answer.replace(/^[A-D][\.\)]\s*/i, "").replace(/^["']|["']$/g, "").trim();
+    }
 
     if (!answer) {
       continue;

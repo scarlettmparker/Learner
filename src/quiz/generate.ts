@@ -101,13 +101,15 @@ Answer: concise phrase
 Explain: wiki span
 
 - Each mcq: 4 distinct full phrases, randomize correct position across A-D, distractors from extract's key concepts, deduplicate stem/options (no option repeats stem substring >5 chars), never placeholders like A/B/C/D or Not ...1.
-- Keep stems and options close to the wiki extract; explanations must quote a short wiki span only (no PageUrl, source is at top).
-- When difficulty advanced/mastery true, use synthesis across sections not just definitions. You must get harder as prior attempts show mastery -add synthesis, application, comparison, dating, relation questions. If you stay on definitions the learner stalls.
+ - You MUST generate the exact number requested (5 for basic/easy, 10 for same/normal, 20 for advanced). Do not stop at 4. Count Q1..Qn and push to the full count; if you run short, pull from different sections, dates, and related topics.
+ - Keep stems and options close to the wiki extract; explanations must quote a short wiki span only (no PageUrl, source is at top).
+ - When difficulty advanced/mastery true, use synthesis across sections not just definitions. You must get harder as prior attempts show mastery -add synthesis, application, comparison, dating, relation questions. If you stay on definitions the learner stalls.
 - Fill blanks must say what kind of answer you expect when it could be vague. Don't write "The treaty was signed in ____." when you want 1919 -write "The treaty was signed in ____ [year]." or "In what year was the treaty signed?" Same for titles, names, places: "in ____ [work]" or "the book ____ [title]". The blank itself doesn't tell the learner if you want a year, a name, or a title, so add [year], [person], [work], [place] or phrase it as a clear question instead of leaving it bare. Every fill must be grammatically correct as an intentional fragment. Read the stem with the answer inserted; it must sound right. Don't write "would ____ [activity]" and expect a gerund like "undermining the process" — that reads "would undermining" and is wrong. Write "would ____ [verb]" for the base form or "would result in ____ [noun phrase]" for the gerund.
 - Don't carve two fills out of one sentence. A common failure is blanking two words from the same source sentence — both Explains quote that one sentence and only the blank moves. That's a repeat, even though the blank word differs. If you use a sentence for one Explain, pick a different sentence or a different paragraph for the next. Explain spans shouldn't share more than a handful of words; stems shouldn't be the same sentence with a different word blanked.
 - Every question must test a different fact and a different span: no two share the same normalized answer (lowercase, strip punctuation, singularise) or the same quoted span. Answers across the quiz must be distinct after lowercasing and singularising.
-- Founder or origin questions (e.g., who introduced a concept) allowed at most once per quiz, and only if not already stated in prior stems; don't leak later answers in earlier stems or options.
-- Follow anti-ai-slop: avoid banned words (delve, tapestry, vibrant, pivotal, crucial, intricate, meticulous, comprehensive, foster, leverage, utilize, seamless, robust, groundbreaking, transformative), mix sentence lengths, no rule-of-three, active voice, ≤1 em dash per 500 words.
+ - Founder or origin questions (e.g., who introduced a concept) allowed at most once per quiz, and only if not already stated in prior stems; don't leak later answers in earlier stems or options.
+ - Answer lines must be bare phrase only, never "A. phrase" or "B. phrase" - the program shuffles and checks the phrase itself, a prefix breaks grading.
+ - Follow anti-ai-slop: avoid banned words (delve, tapestry, vibrant, pivotal, crucial, intricate, meticulous, comprehensive, foster, leverage, utilize, seamless, robust, groundbreaking, transformative), mix sentence lengths, no rule-of-three, active voice, ≤1 em dash per 500 words.
 
 Prior KNOWLEDGE context helps you avoid repeating what the user already knows.
 When full page excerpt is provided, ask detailed questions from the full page scrapes (sections, examples, dates, relations), not just the summary.`,
@@ -135,7 +137,7 @@ ${pagePart}PageUrl: ${args.summary.pageUrl}
 Prior KNOWLEDGE titles: ${args.priorContext || "(none)"}
 Related topics: ${args.related.map((r) => r.title).join(", ") || "(none)"}
 Difficulty: ${difficulty}
-Generate ${args.numQuestions} questions${isAdvanced ? ": 50% short, 25% mcq, 25% fill" : ": ~33% mcq, ~33% fill, ~33% short"}, interleaved (mcq, fill, short, repeat, never 3 of same type in a row).${isAdvanced ? " For advanced, at least half must be synthesis and application: give a new maxim or scenario and ask what the categorical imperative would say, compare formulations, ask why a maxim fails universalization. Don't ask recall like \"central concept\". Never put the answer in parentheses inside an mcq option, and all 4 mcq options must be same type as the answer (all years if answer is a year)." : ""} Return markdown only.`,
+Generate EXACTLY ${args.numQuestions} questions - count them Q1 to Q${args.numQuestions} and do not stop early. You MUST try to reach the full count; if you would normally stop at 4-6, keep going, use different spans, dates, relations, and examples from the full page to fill the rest.${isAdvanced ? " Mix: 50% short, 25% mcq, 25% fill" : " Mix: ~33% mcq, ~33% fill, ~33% short"}, interleaved (mcq, fill, short, repeat, never 3 of same type in a row).${isAdvanced ? " For advanced, at least half must be synthesis and application: give a new scenario and ask what the principle would say, compare formulations, ask why a maxim fails. Don't stay on simple recall. Never put the answer in parentheses inside an mcq option, and all 4 mcq options must be same type as the answer (all years if answer is a year)." : " For same/basic, keep the mix but really push to the full count; use synthesis and dating too where possible, just lighter."} Return markdown only. Answer must be bare phrase, never prefixed with "A. " or "B. " - just the phrase.`,
   };
 }
 
@@ -384,28 +386,39 @@ function describeQuizIssues(quiz: Quiz): string {
  * @param myAnswer - learner answer
  * @returns whether correct
  */
+/**
+ * Strips leading option label like "B. " from an answer string.
+ *
+ * @param s - answer string
+ * @returns stripped
+ */
+function stripLabel(s: string): string {
+  return s.replace(/^[A-D][\.\)]\s*/i, "").replace(/^["']|["']$/g, "").trim();
+}
+
 export async function gradeAnswer(
   question: QuizQuestion,
   myAnswer: string,
 ): Promise<{ correct: boolean }> {
-  const norm = (s: string) => s.trim().toLowerCase();
+  const norm = (s: string) => stripLabel(s).trim().toLowerCase();
+  const cleanAnswer = stripLabel(question.answer);
   if (question.type === "mcq") {
     const trimmed = myAnswer.trim();
     if (/^[a-dA-D]$/.test(trimmed) && question.options) {
       const idx = trimmed.toLowerCase().charCodeAt(0) - 97;
       const chosen = question.options[idx];
-      if (chosen) return { correct: norm(chosen) === norm(question.answer) };
+      if (chosen) return { correct: norm(chosen) === norm(cleanAnswer) };
     }
     if (/^[1-4]$/.test(trimmed) && question.options) {
       const idx = parseInt(trimmed, 10) - 1;
       const chosen = question.options[idx];
-      if (chosen) return { correct: norm(chosen) === norm(question.answer) };
+      if (chosen) return { correct: norm(chosen) === norm(cleanAnswer) };
     }
-    return { correct: norm(myAnswer) === norm(question.answer) };
+    return { correct: norm(myAnswer) === norm(cleanAnswer) };
   }
   if (question.type === "fill")
     return {
-      correct: isFillCorrect(myAnswer, question.answer, {
+      correct: isFillCorrect(myAnswer, cleanAnswer, {
         maxDistance: 1,
         minBigram: 0.72,
       }),
@@ -430,6 +443,6 @@ export async function gradeAnswer(
     if (typeof parsed.correct === "boolean") return { correct: parsed.correct };
   } catch {}
   return {
-    correct: norm(myAnswer).includes(norm(question.answer).slice(0, 10)),
+    correct: norm(myAnswer).includes(norm(cleanAnswer).slice(0, 10)),
   };
 }
