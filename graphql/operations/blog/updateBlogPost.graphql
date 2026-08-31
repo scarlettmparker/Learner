@@ -1,0 +1,14 @@
+mutation updateBlogPost($id: ID!, $input: BlogPostInput!) {
+  blogMutations {
+    updateBlogPost(id: $id, input: $input) {
+      __typename
+      ... on QuerySuccess {
+        message
+        id
+      }
+      ... on StandardError {
+        message
+      }
+    }
+  }
+}

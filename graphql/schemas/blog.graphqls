@@ -92,6 +92,7 @@ input IngestBlogInput {
 
 type BlogMutations {
   createBlogPost(title: String!, input: BlogPostInput): QueryResult
+  updateBlogPost(id: ID!, input: BlogPostInput!): QueryResult
   createBlogPostType(name: String!, description: String): QueryResult
   addRemoteObject(postId: ID!, target: String!): QueryResult
   removeRemoteObject(postId: ID!, target: String!): QueryResult

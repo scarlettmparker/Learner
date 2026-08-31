@@ -10,14 +10,18 @@ import {
 } from "./sources/wikipedia.js";
 import {
   createChildBlog,
+  fetchAdvancedTopics,
   fetchPriorContext,
   findBestParentByWikiExtract,
+  findExistingChildByTopic,
   findParentByTitleFuzzy,
   formatTitleWithDate,
   listChildren,
   listKnowledgeParents,
   pickParentInteractive,
+  updateBlog,
 } from "./sun.js";
+import { withThinking } from "./ui/thinking.js";
 import { generateQuiz } from "./quiz/generate.js";
 import { buildMarkdown } from "./quiz/markdown.js";
 import { runQuiz } from "./quiz/run.js";
@@ -65,7 +69,10 @@ program
     const { token } = await loginViaGaia(username, password);
     console.log(chalk.dim(`Logged in as ${username}`));
 
-    const summary = await fetchWikipediaSummary(topic, token);
+    const summary = await withThinking(
+      `Fetching Wikipedia for "${topic}"...`,
+      () => fetchWikipediaSummary(topic, token),
+    );
     if (!summary) {
       console.error(chalk.red(`No Wikipedia summary for "${topic}"`));
       process.exit(1);
@@ -87,52 +94,111 @@ program
         summary.extract,
         token,
       );
-      if (suggested) {
+      if (suggested)
         console.log(
           chalk.dim(`Suggested parent from wiki: ${suggested.title}`),
         );
-      }
       const picked = await pickParentInteractive(token, suggested);
       parentId = picked.id;
       parentTitle = picked.title;
     }
 
-    const related = await fetchRelatedTopics(topic, token);
-    const priorContext = await fetchPriorContext(topic, token);
-    const numQuestions = parseInt(opts.questions, 10) || 6;
-    const quiz = await generateQuiz(
-      { topic, summary, related, priorContext, numQuestions },
+    const related = await withThinking("Fetching related topics...", () =>
+      fetchRelatedTopics(topic, token),
+    );
+    let priorContext = await withThinking("Fetching prior context...", () =>
+      fetchPriorContext(topic, token),
+    );
+    const existingForContext = await findExistingChildByTopic(
+      parentId,
+      topic,
       token,
+    );
+    if (existingForContext?.content) {
+      const { extractPriorAttempts, buildPriorContextFromAttempts } =
+        await import("./quiz/revisit.js");
+      const attempts = extractPriorAttempts(existingForContext.content);
+      const revisitContext = buildPriorContextFromAttempts(attempts);
+      priorContext = `${priorContext}\n${revisitContext}\nPrior content snippet: ${existingForContext.content.slice(0, 800)}`;
+      const advanced = await withThinking("Searching advanced topics...", () =>
+        fetchAdvancedTopics(topic, token),
+      );
+      if (advanced.length)
+        priorContext += `\nAdvanced related: ${advanced.join(", ")}`;
+    }
+    const numQuestions = parseInt(opts.questions, 10) || 6;
+    const quiz = await withThinking("Thinking - generating quiz...", () =>
+      generateQuiz(
+        { topic, summary, related, priorContext, numQuestions },
+        token,
+      ),
     );
     const { answers, correct, gaps } = await runQuiz(quiz.questions, token);
     console.log(chalk.bold(`\nScore: ${correct}/${quiz.questions.length}`));
 
     if (opts.dryRun) {
       console.log(chalk.yellow("Dry run, not writing blog"));
+      console.log(chalk.dim("\nMarkdown preview:\n"));
+      console.log(
+        buildMarkdown({
+          topic,
+          summary,
+          answers,
+          gaps,
+          related,
+          pageUrl: summary.pageUrl,
+        }),
+      );
       return;
     }
 
-    const titleWithDate = formatTitleWithDate(topic);
-    const markdown = buildMarkdown({
-      topic,
-      summary,
-      answers,
-      gaps,
-      related,
-      pageUrl: summary.pageUrl,
-    });
-    const newId = await createChildBlog(
-      {
-        title: titleWithDate,
-        content: markdown,
-        parentId,
-        parentTypeName: parentTitle,
-      },
-      token,
-    );
-    console.log(
-      chalk.green(`\nCreated child blog "${titleWithDate}" - /blog/${newId}`),
-    );
+    const existing = await findExistingChildByTopic(parentId, topic, token);
+    let newId: string;
+    if (existing) {
+      console.log(
+        chalk.dim(
+          `Found existing "${existing.title}" - updating with new attempt...`,
+        ),
+      );
+      const dateHeader = `\n\n---\n\n## ${formatTitleWithDate(topic)}\n`;
+      const newSection = buildMarkdown({
+        topic,
+        summary,
+        answers,
+        gaps,
+        related,
+        pageUrl: summary.pageUrl,
+      });
+      const updatedContent = `${existing.content ?? ""}${dateHeader}${newSection}`;
+      newId = await updateBlog(existing.id, updatedContent, token);
+      console.log(
+        chalk.green(`\nUpdated blog "${existing.title}" -> /blog/${newId}`),
+      );
+    } else {
+      const titleWithDate = formatTitleWithDate(topic);
+      const markdown = buildMarkdown({
+        topic,
+        summary,
+        answers,
+        gaps,
+        related,
+        pageUrl: summary.pageUrl,
+      });
+      newId = await createChildBlog(
+        {
+          title: titleWithDate,
+          content: markdown,
+          parentId,
+          parentTypeName: parentTitle,
+        },
+        token,
+      );
+      console.log(
+        chalk.green(
+          `\nCreated child blog "${titleWithDate}" -> /blog/${newId}`,
+        ),
+      );
+    }
 
     if (related.length) {
       related.forEach((r, idx) => console.log(`  ${idx + 1}. ${r.title}`));

@@ -12,6 +12,15 @@ import {
   ListBlogPostsDocument,
   type ListBlogPostsQuery,
   type ListBlogPostsQueryVariables,
+  LocateBlogPostDocument,
+  type LocateBlogPostQuery,
+  type LocateBlogPostQueryVariables,
+  UpdateBlogPostDocument,
+  type UpdateBlogPostMutation,
+  type UpdateBlogPostMutationVariables,
+  WikipediaSearchDocument,
+  type WikipediaSearchQuery,
+  type WikipediaSearchQueryVariables,
 } from "./generated/graphql.js";
 import { promptInput } from "./quiz/prompt.js";
 
@@ -165,6 +174,74 @@ export async function createChildBlog(
 }
 
 /**
+ * Finds existing child under parent matching topic prefix (ignores date suffix).
+ * TODO: we need to fix these types and also actually filter in the service
+ */
+export async function findExistingChildByTopic(
+  parentId: string | null,
+  topic: string,
+  token: string,
+): Promise<{ id: string; title: string; content: string | null } | null> {
+  if (!parentId) {
+    return null;
+  }
+  const children = await listChildren(parentId, token);
+  const lowerTopic = topic.toLowerCase();
+  const match = children.find((c) =>
+    c.title.toLowerCase().startsWith(lowerTopic),
+  );
+  if (!match) {
+    return null;
+  }
+  const data = await executeGraphQL<LocateBlogPostQuery>(
+    LocateBlogPostDocument,
+    { id: match.id } as LocateBlogPostQueryVariables,
+    token,
+  );
+  const post = data?.blogQueries?.locateBlogPost;
+  if (!post) {
+    return null;
+  }
+  return { id: post.id, title: post.title, content: post.content ?? null };
+}
+
+/**
+ * Updates existing blog content by appending new markdown.
+ */
+export async function updateBlog(
+  id: string,
+  newContent: string,
+  token: string,
+): Promise<string> {
+  const existingData = await executeGraphQL<LocateBlogPostQuery>(
+    LocateBlogPostDocument,
+    { id } as LocateBlogPostQueryVariables,
+    token,
+  );
+  const existing = existingData?.blogQueries?.locateBlogPost;
+  if (!existing) {
+    throw new Error(`Post not found: ${id}`);
+  }
+  const dateHeader = `\n\n## ${formatTitleWithDate("Update")}\n`;
+  const updatedContent = `${existing.content ?? ""}${dateHeader}${newContent}`;
+  const data = await executeGraphQL<UpdateBlogPostMutation>(
+    UpdateBlogPostDocument,
+    {
+      id,
+      input: { content: updatedContent },
+    } as UpdateBlogPostMutationVariables,
+    token,
+  );
+  const result = data?.blogMutations?.updateBlogPost;
+  if (!result || result.__typename !== "QuerySuccess" || !result.id) {
+    throw new Error(
+      (result as { message?: string })?.message ?? "Failed to update blog post",
+    );
+  }
+  return result.id;
+}
+
+/**
  * Formats title with DD/MM/YYYY HH:MM:SS.
  */
 export function formatTitleWithDate(topic: string): string {
@@ -264,5 +341,28 @@ export async function fetchPriorContext(
     return candidates.map((c) => c.title).join(", ");
   } catch {
     return "";
+  }
+}
+
+/**
+ * Fetches advanced topics via Wikipedia search for revisits.
+ */
+export async function fetchAdvancedTopics(
+  topic: string,
+  token: string,
+): Promise<string[]> {
+  try {
+    const data = await executeGraphQL<WikipediaSearchQuery>(
+      WikipediaSearchDocument,
+      { query: topic } as WikipediaSearchQueryVariables,
+      token,
+    );
+    const results = data?.wikiQueries?.wikipediaSearch ?? [];
+    return results
+      .map((r) => r.title)
+      .filter((t) => t.toLowerCase() !== topic.toLowerCase())
+      .slice(0, 3);
+  } catch {
+    return [];
   }
 }
