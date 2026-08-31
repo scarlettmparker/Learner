@@ -53,21 +53,27 @@ export type GenerateArgs = {
    * Number to generate.
    */
   numQuestions: number;
+  /**
+   * Full page plaintext excerpt.
+   */
+  fullPage?: string | null;
+  /**
+   * Desired difficulty.
+   */
+  difficulty?: "basic" | "same" | "advanced";
+  /**
+   * Whether learner mastered prior.
+   */
+  mastery?: boolean;
 };
 
 /**
- * Generates quiz via Muse Spark with anti-ai-slop constraints.
+ * Builds system prompt for IR markdown.
  *
- * @param props - generation args
- * @param _token - unused auth token
- * @returns quiz
+ * @returns system message
  */
-export async function generateQuiz(
-  props: GenerateArgs,
-  _token: string,
-): Promise<Quiz> {
-  const args = props;
-  const system: ChatMessage = {
+function buildSystemPrompt(): ChatMessage {
+  return {
     role: "system",
     content: `You are Sun Learn's quiz generator. Create an interactive quiz from the Wikipedia extract below.
 
@@ -90,29 +96,72 @@ Q3 [short] Open question?
 Answer: concise phrase
 Explain: wiki span
 
-- Each mcq: 4 distinct plausible full phrases, randomize correct position across A-D, distractors from extract's key concepts.
-- Keep stems and options verbatim-friendly to the wiki extract; explanations must quote a short wiki span.
+- Each mcq: 4 distinct plausible full phrases, randomize correct position across A-D, distractors from extract's key concepts, deduplicate stem/options (no option repeats stem substring >5 chars), never placeholders like A/B/C/D or Not ...1.
+- Keep stems and options verbatim-friendly to the wiki extract; explanations must quote a short wiki span and include pageUrl.
+- When difficulty advanced/mastery true, use synthesis across sections not just definitions.
 - Follow anti-ai-slop: avoid banned words (delve, tapestry, vibrant, pivotal, crucial, intricate, meticulous, comprehensive, foster, leverage, utilize, seamless, robust, groundbreaking, transformative), mix sentence lengths, no rule-of-three, active voice, ≤1 em dash per 500 words.
 
-Prior KNOWLEDGE context helps you avoid repeating what the user already knows.`,
+Prior KNOWLEDGE context helps you avoid repeating what the user already knows.
+When full page excerpt is provided, ask detailed questions from the full page scrapes (sections, examples, dates, relations), not just the summary.`, 
   };
-  const user: ChatMessage = {
+}
+
+/**
+ * Builds user prompt from args.
+ *
+ * @param args - generation args
+ * @returns user message
+ */
+function buildUserPrompt(args: GenerateArgs): ChatMessage {
+  const pagePart = args.fullPage ? `Full page excerpt (plaintext, up to 12000 chars, use for detailed questions):\n${args.fullPage.slice(0, 8000)}\n` : "";
+  const difficulty = args.difficulty ?? (args.mastery ? "advanced" : "same");
+  return {
     role: "user",
     content: `Topic: ${args.topic}
 Wiki title: ${args.summary.title}
 Wiki extract: ${args.summary.extract}
-PageUrl: ${args.summary.pageUrl}
+${pagePart}PageUrl: ${args.summary.pageUrl}
 Prior KNOWLEDGE titles: ${args.priorContext || "(none)"}
 Related topics: ${args.related.map((r) => r.title).join(", ") || "(none)"}
-Generate ${args.numQuestions} questions: 50% mcq, 25% fill, 25% short. Return markdown only.`,
+Difficulty: ${difficulty}
+Generate ${args.numQuestions} questions: ~33% mcq, ~33% fill, ~33% short (balanced). Return markdown only.`,
   };
+}
+
+/**
+ * Generates quiz via Muse Spark with anti-ai-slop constraints.
+ *
+ * @param props - generation args
+ * @param _token - unused auth token
+ * @returns quiz
+ */
+export async function generateQuiz(props: GenerateArgs, _token: string): Promise<Quiz> {
+  const args = props;
+  const system = buildSystemPrompt();
+  const user = buildUserPrompt(args);
   const text = await callMuseSpark([system, user]);
   const parsed = parseMarkdownToQuiz(text, args);
-  if (parsed) {
-    return parsed;
-  }
-
+  if (parsed && hasDistinctOptions(parsed)) return parsed;
+  if (parsed) throw new Error(`Quiz had duplicate options: ${text.slice(0, 600)}`);
   throw new Error(`Failed to generate quiz - response was not markdown: ${text.slice(0, 600)}`);
+}
+
+/**
+ * Checks mcq options are distinct.
+ *
+ * @param quiz - parsed quiz
+ * @returns true if distinct
+ */
+function hasDistinctOptions(quiz: Quiz): boolean {
+  for (const q of quiz.questions) {
+    if (q.type !== "mcq" || !q.options) continue;
+    const lower = q.options.map((o) => o.toLowerCase().trim());
+    if (new Set(lower).size !== lower.length) return false;
+    for (const opt of lower) {
+      if (q.stem.toLowerCase().includes(opt.slice(0, 10)) && opt.length > 10) return false;
+    }
+  }
+  return true;
 }
 
 /**
@@ -138,9 +187,7 @@ export async function gradeAnswer(
     }
     return { correct: norm(myAnswer) === norm(question.answer) };
   }
-  if (question.type === "fill") {
-    return { correct: norm(myAnswer) === norm(question.answer) };
-  }
+  if (question.type === "fill") return { correct: norm(myAnswer) === norm(question.answer) };
   const system: ChatMessage = {
     role: "system",
     content: "You judge short answers. Return JSON {correct: boolean}.",
@@ -154,7 +201,5 @@ export async function gradeAnswer(
     const parsed = JSON.parse(text) as { correct?: boolean };
     if (typeof parsed.correct === "boolean") return { correct: parsed.correct };
   } catch {}
-  return {
-    correct: norm(myAnswer).includes(norm(question.answer).slice(0, 10)),
-  };
+  return { correct: norm(myAnswer).includes(norm(question.answer).slice(0, 10)) };
 }

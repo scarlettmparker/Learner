@@ -1,0 +1,5 @@
+query wikipediaPage($title: String!) {
+  wikiQueries {
+    wikipediaPage(title: $title)
+  }
+}
