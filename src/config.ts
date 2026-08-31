@@ -18,13 +18,13 @@ export type LearnerConfig = {
    */
   clientSecret: string;
   /**
-   * OpenAI API key for LLM.
+   * LLM API key.
    */
-  openaiApiKey: string;
+  llmApiKey: string;
   /**
-   * OpenAI base URL.
+   * LLM base URL.
    */
-  openaiBaseUrl: string;
+  llmBaseUrl: string;
   /**
    * Model name.
    */
@@ -76,31 +76,31 @@ export function loadConfig(): LearnerConfig {
   if (!clientSecret) {
     throw new Error("Missing SUN_CLIENT_SECRET or CLIENT_SECRET");
   }
-  const openaiApiKey = process.env.OPENAI_API_KEY;
-  if (!openaiApiKey) {
-    throw new Error("Missing OPENAI_API_KEY");
+  const llmApiKey = process.env.LLM_API_KEY;
+  if (!llmApiKey) {
+    throw new Error("Missing LLM_API_KEY");
   }
-  const openaiBaseUrl = process.env.OPENAI_BASE_URL;
-  if (!openaiBaseUrl) {
-    throw new Error("Missing OPENAI_BASE_URL");
+  const llmBaseUrl = process.env.LLM_BASE_URL;
+  if (!llmBaseUrl) {
+    throw new Error("Missing LLM_BASE_URL");
   }
-  const model = process.env.OPENAI_MODEL;
+  const model = process.env.LLM_MODEL;
   if (!model) {
-    throw new Error("Missing OPENAI_MODEL");
+    throw new Error("Missing LLM_MODEL");
   }
-  const reasoningEffort = parseEffort(process.env.OPENAI_REASONING_EFFORT) ?? "medium";
-  const fastReasoningEffort = parseEffort(process.env.OPENAI_FAST_EFFORT) ?? "low";
-  const verbosity = parseVerbosity(process.env.OPENAI_VERBOSITY);
-  const fastVerbosity = parseVerbosity(process.env.OPENAI_FAST_VERBOSITY) ?? "low";
-  const maxOutputTokens = parseIntSafe(process.env.OPENAI_MAX_OUTPUT_TOKENS);
-  const assessMaxTokens = parseIntSafe(process.env.OPENAI_ASSESS_MAX_TOKENS) ?? 128;
-  const gradeMaxTokens = parseIntSafe(process.env.OPENAI_GRADE_MAX_TOKENS) ?? 16;
+  const reasoningEffort = parseEffort(process.env.LLM_REASONING_EFFORT) ?? "medium";
+  const fastReasoningEffort = parseEffort(process.env.LLM_FAST_EFFORT) ?? "low";
+  const verbosity = parseVerbosity(process.env.LLM_VERBOSITY);
+  const fastVerbosity = parseVerbosity(process.env.LLM_FAST_VERBOSITY) ?? "low";
+  const maxOutputTokens = parseIntSafe(process.env.LLM_MAX_OUTPUT_TOKENS);
+  const assessMaxTokens = parseIntSafe(process.env.LLM_ASSESS_MAX_TOKENS) ?? 128;
+  const gradeMaxTokens = parseIntSafe(process.env.LLM_GRADE_MAX_TOKENS) ?? 16;
   return {
     graphqlEndpoint,
     clientId,
     clientSecret,
-    openaiApiKey,
-    openaiBaseUrl,
+    llmApiKey,
+    llmBaseUrl,
     model,
     reasoningEffort,
     fastReasoningEffort,

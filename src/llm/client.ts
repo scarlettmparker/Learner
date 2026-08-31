@@ -103,14 +103,14 @@ export async function callLLM(
   opts?: CallOptions,
 ): Promise<string> {
   const config = loadConfig();
-  const body = isChatCompletionsUrl(config.openaiBaseUrl)
+  const body = isChatCompletionsUrl(config.llmBaseUrl)
     ? buildChatCompletionsBody(messages, config, opts)
     : buildResponsesBody(messages, config, opts);
-  const res = await fetch(config.openaiBaseUrl, {
+  const res = await fetch(config.llmBaseUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${config.openaiApiKey}`,
+      Authorization: `Bearer ${config.llmApiKey}`,
     },
     body: JSON.stringify(body),
   });

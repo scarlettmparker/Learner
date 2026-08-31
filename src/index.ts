@@ -620,7 +620,7 @@ program
   .description("Show current config from env")
   .action(() => {
     const config = loadConfig();
-    console.log(JSON.stringify({ ...config, openaiApiKey: "***" }, null, 2));
+    console.log(JSON.stringify({ ...config, llmApiKey: "***" }, null, 2));
   });
 
 program.parse();

@@ -1,3 +1,4 @@
+import { areExplanationsOverlapping, isFillCorrect } from "@sun/utils/nlp";
 import { callLLM, type ChatMessage } from "../llm/client.js";
 import { loadConfig } from "../config.js";
 import type { WikiSummary, RelatedTopic } from "../sources/wikipedia.js";
@@ -78,6 +79,8 @@ function buildSystemPrompt(): ChatMessage {
     role: "system",
     content: `You are Sun Learn's quiz generator. Create an interactive quiz from the Wikipedia extract below. Spend minimal thinking, give results directly.
 
+Before you write, read every skill in .opencode/skills/* and apply them together: fill-blank-clarity, quiz-dedup-guard, quiz-balance, quiz-markdown-writer, mastery-assessor, wiki-context-fetcher, knowledge-parent-picker, plus anti-ai-slop-writing references/banned-words.md. Don't skip one.
+
 Rules:
 - Output markdown only, no JSON, no code block wrapper.
 - Format exactly:
@@ -97,11 +100,13 @@ Q3 [short] Open question?
 Answer: concise phrase
 Explain: wiki span
 
-- Each mcq: 4 distinct plausible full phrases, randomize correct position across A-D, distractors from extract's key concepts, deduplicate stem/options (no option repeats stem substring >5 chars), never placeholders like A/B/C/D or Not ...1.
-- Keep stems and options verbatim-friendly to the wiki extract; explanations must quote a short wiki span only (no PageUrl, source is at top).
-- When difficulty advanced/mastery true, use synthesis across sections not just definitions. Must become harder over time as prior attempts show mastery: increase synthesis, application, comparison, dating, and relation questions. Spaced repetition of concepts is fine but avoid frequent near-duplicates.
-- Founder/thinker questions (e.g., which thinker created ...) are allowed at most once per quiz, and only if not already stated in prior stems; do not leak later answers in earlier stems/options. Earlier questions must not name the entity that is the answer to a later question.
-- Every question must test a different fact/span: no two questions share the same normalized answer (lowercase, strip punctuation) or the same quoted span. Answers across the quiz must be distinct.
+- Each mcq: 4 distinct full phrases, randomize correct position across A-D, distractors from extract's key concepts, deduplicate stem/options (no option repeats stem substring >5 chars), never placeholders like A/B/C/D or Not ...1.
+- Keep stems and options close to the wiki extract; explanations must quote a short wiki span only (no PageUrl, source is at top).
+- When difficulty advanced/mastery true, use synthesis across sections not just definitions. You must get harder as prior attempts show mastery -add synthesis, application, comparison, dating, relation questions. If you stay on definitions the learner stalls.
+- Fill blanks must say what kind of answer you expect when it could be vague. Don't write "Kant introduced the categorical imperative in ____." when you want 1785 -write "Kant introduced the categorical imperative in ____ [year]." or "In what year did Kant introduce..." Same for titles, names, places: "in ____ [work]" or "the book ____ [title]". The blank line itself doesn't tell the learner if you want a year, a name, or a title, so add [year], [person], [work], [place] or phrase it as a clear question instead of leaving it bare.
+- Don't carve two fills out of one sentence. The Q8/Q9 maxim/universal pair is exactly what not to do -both Explain lines quoted "Act only according to that maxim whereby you can... universal law" and only the blank moved. That's a repeat, even though the blank word differs. If you use a sentence for one Explain, pick a different sentence or a different paragraph for the next. Explain spans shouldn't share more than a handful of words; stems shouldn't be the same sentence with a different word blanked.
+- Every question must test a different fact and a different span: no two share the same normalized answer (lowercase, strip punctuation, singularise) or the same quoted span. Answers across the quiz must be distinct after lowercasing and singularising.
+- Founder/thinker questions (e.g., which thinker created ...) allowed at most once per quiz, and only if not already stated in prior stems; don't leak later answers in earlier stems/options. Earlier questions mustn't name the entity that is the answer to a later one.
 - Follow anti-ai-slop: avoid banned words (delve, tapestry, vibrant, pivotal, crucial, intricate, meticulous, comprehensive, foster, leverage, utilize, seamless, robust, groundbreaking, transformative), mix sentence lengths, no rule-of-three, active voice, ≤1 em dash per 500 words.
 
 Prior KNOWLEDGE context helps you avoid repeating what the user already knows.
@@ -116,7 +121,9 @@ When full page excerpt is provided, ask detailed questions from the full page sc
  * @returns user message
  */
 function buildUserPrompt(args: GenerateArgs): ChatMessage {
-  const pagePart = args.fullPage ? `Full page excerpt (plaintext, up to 12000 chars, use for detailed questions):\n${args.fullPage.slice(0, 8000)}\n` : "";
+  const pagePart = args.fullPage
+    ? `Full page excerpt (plaintext, up to 12000 chars, use for detailed questions):\n${args.fullPage.slice(0, 8000)}\n`
+    : "";
   const difficulty = args.difficulty ?? (args.mastery ? "advanced" : "same");
   return {
     role: "user",
@@ -138,7 +145,68 @@ Generate ${args.numQuestions} questions: ~33% mcq, ~33% fill, ~33% short (balanc
  * @param _token - unused auth token
  * @returns quiz
  */
-export async function generateQuiz(props: GenerateArgs, _token: string): Promise<Quiz> {
+/**
+ * Drops overlapping questions locally, no LLM retry.
+ *
+ * @param quiz - parsed quiz
+ * @returns deduped quiz
+ */
+function dedupQuiz(quiz: Quiz): Quiz {
+  const kept: QuizQuestion[] = [];
+  for (const q of quiz.questions) {
+    let duplicate = false;
+    for (const k of kept) {
+      if (k.answer.toLowerCase().trim() === q.answer.toLowerCase().trim()) {
+        duplicate = true;
+        break;
+      }
+      if (k.stem.toLowerCase().trim() === q.stem.toLowerCase().trim()) {
+        duplicate = true;
+        break;
+      }
+      if (
+        k.explanation &&
+        q.explanation &&
+        areExplanationsOverlapping(k.explanation, q.explanation)
+      ) {
+        duplicate = true;
+        break;
+      }
+      const normStem = (s: string): string =>
+        s
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, " ")
+          .trim();
+      if (normStem(k.stem) === normStem(q.stem)) {
+        duplicate = true;
+        break;
+      }
+      const a = k.stem.toLowerCase();
+      const b = q.stem.toLowerCase();
+      if (
+        a.includes(q.answer.toLowerCase().slice(0, 12)) &&
+        q.answer.length > 12
+      ) {
+        duplicate = true;
+        break;
+      }
+      if (
+        b.includes(k.answer.toLowerCase().slice(0, 12)) &&
+        k.answer.length > 12
+      ) {
+        duplicate = true;
+        break;
+      }
+    }
+    if (!duplicate) kept.push(q);
+  }
+  return { questions: kept };
+}
+
+export async function generateQuiz(
+  props: GenerateArgs,
+  _token: string,
+): Promise<Quiz> {
   const args = props;
   const system = buildSystemPrompt();
   const user = buildUserPrompt(args);
@@ -149,8 +217,10 @@ export async function generateQuiz(props: GenerateArgs, _token: string): Promise
     maxOutputTokens: config.maxOutputTokens,
   });
   const parsed = parseMarkdownToQuiz(text, args);
-  if (parsed) return parsed;
-  throw new Error(`Failed to generate quiz - response was not markdown: ${text.slice(0, 600)}`);
+  if (parsed) return dedupQuiz(parsed);
+  throw new Error(
+    `Failed to generate quiz - response was not markdown: ${text.slice(0, 600)}`,
+  );
 }
 
 /**
@@ -165,7 +235,8 @@ function hasDistinctOptions(quiz: Quiz): boolean {
     const lower = q.options.map((o) => o.toLowerCase().trim());
     if (new Set(lower).size !== lower.length) return false;
     for (const opt of lower) {
-      if (q.stem.toLowerCase().includes(opt.slice(0, 10)) && opt.length > 10) return false;
+      if (q.stem.toLowerCase().includes(opt.slice(0, 10)) && opt.length > 10)
+        return false;
     }
   }
   return true;
@@ -178,7 +249,11 @@ function hasDistinctOptions(quiz: Quiz): boolean {
  * @returns true if valid
  */
 function hasDistinctAnswersAndStems(quiz: Quiz): boolean {
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
   const answers = quiz.questions.map((q) => norm(q.answer));
   if (new Set(answers).size !== answers.length) return false;
   for (let i = 0; i < quiz.questions.length; i++) {
@@ -186,8 +261,16 @@ function hasDistinctAnswersAndStems(quiz: Quiz): boolean {
       const a = quiz.questions[i];
       const b = quiz.questions[j];
       if (norm(a.stem) === norm(b.stem)) return false;
-      if (b.stem.toLowerCase().includes(a.answer.toLowerCase().slice(0, 12)) && a.answer.length > 12) return false;
-      if (a.stem.toLowerCase().includes(b.answer.toLowerCase().slice(0, 12)) && b.answer.length > 12) return false;
+      if (
+        b.stem.toLowerCase().includes(a.answer.toLowerCase().slice(0, 12)) &&
+        a.answer.length > 12
+      )
+        return false;
+      if (
+        a.stem.toLowerCase().includes(b.answer.toLowerCase().slice(0, 12)) &&
+        b.answer.length > 12
+      )
+        return false;
     }
   }
   const founderCount = quiz.questions.filter((q) =>
@@ -204,16 +287,23 @@ function hasDistinctAnswersAndStems(quiz: Quiz): boolean {
  * @returns issue description
  */
 function describeQuizIssues(quiz: Quiz): string {
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const norm = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
   const seen = new Map<string, number>();
   const issues: string[] = [];
   quiz.questions.forEach((q, idx) => {
     const n = norm(q.answer);
     const prev = seen.get(n);
-    if (prev !== undefined) issues.push(`Q${prev + 1} and Q${idx + 1} share answer "${q.answer}"`);
+    if (prev !== undefined)
+      issues.push(`Q${prev + 1} and Q${idx + 1} share answer "${q.answer}"`);
     else seen.set(n, idx);
   });
-  return issues.join("; ") || "duplicate stems/answers or cross-question leakage";
+  return (
+    issues.join("; ") || "duplicate stems/answers or cross-question leakage"
+  );
 }
 
 /**
@@ -239,10 +329,17 @@ export async function gradeAnswer(
     }
     return { correct: norm(myAnswer) === norm(question.answer) };
   }
-  if (question.type === "fill") return { correct: norm(myAnswer) === norm(question.answer) };
+  if (question.type === "fill")
+    return {
+      correct: isFillCorrect(myAnswer, question.answer, {
+        maxDistance: 1,
+        minBigram: 0.72,
+      }),
+    };
   const system: ChatMessage = {
     role: "system",
-    content: "You judge short answers. Return JSON {correct: boolean} only. Spend minimal thinking, no chain-of-thought.",
+    content:
+      "You judge short answers. Return JSON {correct: boolean} only. Spend minimal thinking, no chain-of-thought.",
   };
   const user: ChatMessage = {
     role: "user",
@@ -258,5 +355,7 @@ export async function gradeAnswer(
     const parsed = JSON.parse(text) as { correct?: boolean };
     if (typeof parsed.correct === "boolean") return { correct: parsed.correct };
   } catch {}
-  return { correct: norm(myAnswer).includes(norm(question.answer).slice(0, 10)) };
+  return {
+    correct: norm(myAnswer).includes(norm(question.answer).slice(0, 10)),
+  };
 }

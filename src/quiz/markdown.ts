@@ -69,11 +69,15 @@ function cleanDetail(detail: string): string {
  * @param correct - whether correct
  * @returns merged cell
  */
-function buildResultCell(myAns: string, corr: string, correct: boolean): string {
+function buildResultCell(
+  myAns: string,
+  corr: string,
+  correct: boolean,
+): string {
   const norm = (s: string) => s.trim().toLowerCase();
   const same = norm(myAns) === norm(corr);
-  if (correct) return same ? `[x] ${myAns}` : `[x] ${myAns} → ${corr}`;
-  return `${myAns} → [ ] ${corr}`;
+  if (correct) return same ? `[x] ${myAns}` : `[x] ${myAns} -> ${corr}`;
+  return `${myAns} -> [ ] ${corr}`;
 }
 
 /**
