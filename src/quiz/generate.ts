@@ -1,4 +1,4 @@
-import { callMuseSpark, type ChatMessage } from "../llm/client.js";
+import { callLLM, type ChatMessage } from "../llm/client.js";
 import { loadConfig } from "../config.js";
 import type { WikiSummary, RelatedTopic } from "../sources/wikipedia.js";
 import { parseMarkdownToQuiz } from "./parse-markdown.js";
@@ -143,35 +143,13 @@ export async function generateQuiz(props: GenerateArgs, _token: string): Promise
   const system = buildSystemPrompt();
   const user = buildUserPrompt(args);
   const config = loadConfig();
-  const text = await callMuseSpark([system, user], {
+  const text = await callLLM([system, user], {
     effort: config.reasoningEffort,
     verbosity: config.verbosity,
     maxOutputTokens: config.maxOutputTokens,
   });
   const parsed = parseMarkdownToQuiz(text, args);
-  const validated = parsed && hasDistinctOptions(parsed) && hasDistinctAnswersAndStems(parsed) ? parsed : null;
-  if (validated) return validated;
-  if (parsed) {
-    const retryText = await callMuseSpark(
-      [
-        system,
-        user,
-        {
-          role: "user",
-          content: `Prior output had duplicate or leaked questions: ${describeQuizIssues(parsed)} Regenerate with all different facts/answers, no shared answer strings, no cross-question leakage, balanced ~33% each, and harder over time if mastery.`,
-        },
-      ],
-      {
-        effort: config.reasoningEffort,
-        verbosity: config.verbosity,
-        maxOutputTokens: config.maxOutputTokens,
-      },
-    );
-    const reparsed = parseMarkdownToQuiz(retryText, args);
-    if (reparsed && hasDistinctOptions(reparsed) && hasDistinctAnswersAndStems(reparsed)) return reparsed;
-    if (reparsed) throw new Error(`Quiz had duplicate/leaked questions: ${retryText.slice(0, 600)}`);
-    throw new Error(`Failed to generate quiz - retry was not markdown: ${retryText.slice(0, 600)}`);
-  }
+  if (parsed) return parsed;
   throw new Error(`Failed to generate quiz - response was not markdown: ${text.slice(0, 600)}`);
 }
 
@@ -272,7 +250,7 @@ export async function gradeAnswer(
   };
   try {
     const config = loadConfig();
-    const text = await callMuseSpark([system, user], {
+    const text = await callLLM([system, user], {
       effort: config.fastReasoningEffort,
       verbosity: config.fastVerbosity,
       maxOutputTokens: config.gradeMaxTokens,

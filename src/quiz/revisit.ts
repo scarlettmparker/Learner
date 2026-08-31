@@ -1,4 +1,4 @@
-import { callMuseSpark } from "../llm/client.js";
+import { callLLM } from "../llm/client.js";
 import { loadConfig } from "../config.js";
 
 export type PriorAttempt = {
@@ -168,7 +168,7 @@ export async function assessReadiness(
       content: `Attempts: ${attempts.length}, latest gaps: ${gaps.join(", ") || "none"}, summary: ${summaryExtract.slice(0, 600)}, related: ${relatedTitles.join(", ")}`,
     };
     const config = loadConfig();
-    const text = await callMuseSpark([system, user], {
+    const text = await callLLM([system, user], {
       effort: config.fastReasoningEffort,
       verbosity: config.fastVerbosity,
       maxOutputTokens: config.assessMaxTokens,
