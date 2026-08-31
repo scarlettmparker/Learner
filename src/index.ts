@@ -473,10 +473,8 @@ async function promptDifficultyAtStart(): Promise<string> {
     type: "select",
     name: "difficulty",
     message: "How challenging should this quiz be?",
-    choices: ["default", "more advanced", "more basic"],
+    choices: ["default", "advanced", "basic"],
   });
-  if (difficulty === "more advanced") return "advanced";
-  if (difficulty === "more basic") return "basic";
   return "default";
 }
 
