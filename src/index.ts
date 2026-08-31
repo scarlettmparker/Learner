@@ -507,7 +507,17 @@ async function runLearnSession(
     token,
   );
   const blogCtx = await gatherBlogContext(normalizedTopic, parentChoice, token);
-  const relatedEnrichment = await scrapeRelatedPages(wiki.related, token);
+  const topicLower = normalizedTopic.toLowerCase();
+  const filteredRelated = wiki.related.filter(
+    (r) =>
+      r.title.toLowerCase().includes(topicLower) ||
+      r.extract?.toLowerCase().includes(topicLower) ||
+      topicLower.includes(r.title.toLowerCase().split(" ")[0] ?? ""),
+  );
+  const relatedEnrichment = await scrapeRelatedPages(
+    filteredRelated.length ? filteredRelated.slice(0, 2) : [],
+    token,
+  );
   const fullPageEnriched = [wiki.fullPage, relatedEnrichment]
     .filter(Boolean)
     .join("\n\n");
