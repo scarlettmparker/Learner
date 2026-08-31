@@ -333,7 +333,7 @@ async function createOrUpdateBlog(
         `Found existing "${existing.title}" - updating with new attempt...`,
       ),
     );
-    const dateHeader = `\n\n---\n\n## ${formatTitleWithDate(topic)}\n`;
+    const dateHeader = `\n---\n### ${formatTitleWithDate(topic)}\n`;
     const newSection = buildMarkdown(
       {
         topic,

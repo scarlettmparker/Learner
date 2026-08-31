@@ -94,15 +94,11 @@ export function buildMarkdown(
 ): string {
   const includeResearch = opts?.includeResearch ?? true;
   const lines: string[] = [];
-  if (args.mastery)
-    lines.push("> Mastery detected - expanded to advanced material");
-  if (args.mastery) lines.push("");
+  if (args.mastery) lines.push("> Mastery detected - expanded to advanced material");
   if (includeResearch) {
     lines.push(`Source: [${args.summary.title}](${args.pageUrl})`);
-    lines.push("");
     lines.push("### What was researched");
     lines.push(`> ${args.summary.extract}`);
-    lines.push("");
   }
   lines.push("### What I answered");
   lines.push("| # | Q | Result | Detail |");
@@ -115,7 +111,6 @@ export function buildMarkdown(
     const result = buildResultCell(myAns, corr, a.correct);
     lines.push(`| ${idx + 1} | ${q} | ${result} | ${detail} |`);
   });
-  lines.push("");
   lines.push("### Gaps");
   if (args.gaps.length) args.gaps.forEach((g) => lines.push(`- ${g}`));
   else lines.push("- none - all correct");
