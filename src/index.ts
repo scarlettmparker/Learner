@@ -269,7 +269,7 @@ function resolveDifficultyAndCount(
   opts: LearnOptions,
   readinessReady: boolean,
   difficultyOpt?: string,
-): { count: number; difficulty: "basic" | "same" | "advanced" } {
+): { count: number; difficulty: "basic" | "default" | "advanced" } {
   const explicit = (difficultyOpt ?? opts.difficulty ?? "").toLowerCase();
   if (explicit === "basic")
     return { count: parseInt(opts.questions, 10) || 5, difficulty: "basic" };
@@ -288,12 +288,12 @@ function resolveDifficultyAndCount(
     if (!Number.isNaN(n))
       return {
         count: readinessReady ? Math.max(15, n) : n,
-        difficulty: readinessReady ? "advanced" : "same",
+        difficulty: readinessReady ? "advanced" : "default",
       };
   }
   if (readinessReady) return { count: 20, difficulty: "advanced" };
-  if (explicit === "same" || !explicit)
-    return { count: 10, difficulty: "same" };
+  if (explicit === "default" || explicit === "same" || !explicit)
+    return { count: 10, difficulty: "default" };
   return { count: 5, difficulty: "basic" };
 }
 
@@ -444,7 +444,7 @@ async function promptRecurring(
       "What do you want to learn more of? Type a new topic, or Enter to finish:",
   });
   if (!choice || !choice.trim())
-    return { nextTopic: null, nextDifficulty: "same" };
+    return { nextTopic: null, nextDifficulty: "default" };
   const trimmed = choice.trim();
   const num = parseInt(trimmed, 10);
   let nextTopic: string | null = null;
@@ -457,14 +457,14 @@ async function promptRecurring(
     message: "How challenging should the next quiz be?",
     choices: ["same level", "more advanced", "more basic"],
   });
-  let nextDifficulty = "same";
+  let nextDifficulty = "default";
   if (difficulty === "more advanced") nextDifficulty = "advanced";
   else if (difficulty === "more basic") nextDifficulty = "basic";
   return { nextTopic, nextDifficulty };
 }
 
 /**
- * Prompts for difficulty at start, defaults to same.
+ * Prompts for difficulty at start, defaults to default.
  *
  * @returns chosen difficulty
  */
@@ -477,7 +477,7 @@ async function promptDifficultyAtStart(): Promise<string> {
   });
   if (difficulty === "more advanced") return "advanced";
   if (difficulty === "more basic") return "basic";
-  return "same";
+  return "default";
 }
 
 /**
@@ -499,7 +499,8 @@ async function runLearnSession(
     startDifficulty = await promptDifficultyAtStart();
   }
   const wiki = await scrapeWiki(topic, token);
-  const normalizedTopic = (wiki.summary as NonNullable<WikiBucket["summary"]>).title;
+  const normalizedTopic = (wiki.summary as NonNullable<WikiBucket["summary"]>)
+    .title;
   const parentChoice = await resolveParent(
     wiki.summary as NonNullable<WikiBucket["summary"]>,
     opts,
@@ -532,7 +533,7 @@ async function runLearnSession(
   );
   const combinedPrior = blogCtx.priorContext;
   const quiz = await withThinking(
-    `Thinking - generating quiz (${numQuestions} questions, ${difficulty})...`,
+    `Thinking - generating quiz (~${numQuestions} questions, ${difficulty})...`,
     () =>
       generateQuiz({
         topic: normalizedTopic,
@@ -626,7 +627,11 @@ program
   .argument("[topic]", "topic to learn")
   .option("--parent <title>", "parent blog title")
   .option("--questions <n>", "number of questions", "10")
-  .option("--difficulty <level>", "difficulty: basic|same|advanced", "same")
+  .option(
+    "--difficulty <level>",
+    "difficulty: basic|default|advanced",
+    "default",
+  )
   .option("--source <kind>", "source kind", "wikipedia")
   .option("--dry-run", "do not write blog")
   .action(async (topic: string | undefined, opts: LearnOptions) => {

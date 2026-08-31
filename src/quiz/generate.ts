@@ -62,7 +62,7 @@ export type GenerateArgs = {
   /**
    * Desired difficulty.
    */
-  difficulty?: "basic" | "same" | "advanced";
+  difficulty?: "basic" | "default" | "advanced";
   /**
    * Whether learner mastered prior.
    */
@@ -101,7 +101,7 @@ Answer: concise phrase
 Explain: wiki span
 
  - Each mcq: 4 distinct full phrases, randomize correct position across A-D, distractors from extract's key concepts, deduplicate stem/options (no option repeats stem substring >5 chars), never placeholders like A/B/C/D or Not ...1.
-  - You MUST generate the exact number requested (5 for basic/easy, 10 for same/normal, 15-20 for advanced hard floor 15 target 20 accept >=15). Do not stop at 4. Count Q1..Qn and push to the full count; if you run short, pull from different sections, dates, and related topics.
+   - You MUST generate the exact number requested (5 for basic/easy, 10 for default/normal, 15-20 for advanced hard floor 15 target 20 accept >=15). Do not stop at 4. Count Q1..Qn and push to the full count; if you run short, pull from different sections, dates, and related topics.
  - Keep stems and options close to the wiki extract; explanations must quote a short wiki span only (no PageUrl, source is at top).
  - When difficulty advanced/mastery true, use synthesis across sections not just definitions. You must get harder as prior attempts show mastery -add synthesis, application, comparison, dating, relation questions. If you stay on definitions the learner stalls.
 - Fill blanks must say what kind of answer you expect when it could be vague. Don't write "The treaty was signed in ____." when you want 1919 -write "The treaty was signed in ____ [year]." or "In what year was the treaty signed?" Same for titles, names, places: "in ____ [work]" or "the book ____ [title]". The blank itself doesn't tell the learner if you want a year, a name, or a title, so add [year], [person], [work], [place] or phrase it as a clear question instead of leaving it bare. Every fill must be grammatically correct as an intentional fragment. Read the stem with the answer inserted; it must sound right. Don't write "would ____ [activity]" and expect a gerund like "undermining the process" 0 that reads "would undermining" and is wrong. Write "would ____ [verb]" for the base form or "would result in ____ [noun phrase]" for the gerund.
@@ -126,7 +126,7 @@ function buildUserPrompt(args: GenerateArgs): ChatMessage {
   const pagePart = args.fullPage
     ? `Full page excerpt (chunked, spans entire page):\n${args.fullPage}\n`
     : "";
-  const difficulty = args.difficulty ?? (args.mastery ? "advanced" : "same");
+  const difficulty = args.difficulty ?? (args.mastery ? "advanced" : "default");
   const isAdvanced = difficulty === "advanced";
   return {
     role: "user",
@@ -137,7 +137,7 @@ ${pagePart}PageUrl: ${args.summary.pageUrl}
 Prior KNOWLEDGE titles: ${args.priorContext || "(none)"}
 Related topics: ${args.related.map((r) => r.title).join(", ") || "(none)"}
 Difficulty: ${difficulty}
-Generate EXACTLY ${args.numQuestions} questions - count them Q1 to Q${args.numQuestions} and do not stop early. You MUST try to reach the full count; if you would normally stop at 4-6, keep going, use different spans, dates, relations, and examples from the full page to fill the rest.${isAdvanced ? " Mix: 50% short, 25% mcq, 25% fill" : " Mix: ~33% mcq, ~33% fill, ~33% short"}, interleaved (mcq, fill, short, repeat, never 3 of same type in a row).${isAdvanced ? " For advanced, at least half must be synthesis and application: give a new scenario and ask what the principle would say, compare formulations, ask why a maxim fails. Don't stay on simple recall. Never put the answer in parentheses inside an mcq option, and all 4 mcq options must be same type as the answer (all years if answer is a year)." : " For same/basic, keep the mix but really push to the full count; use synthesis and dating too where possible, just lighter."} Return markdown only. Answer must be bare phrase, never prefixed with "A. " or "B. " - just the phrase.`,
+Generate EXACTLY ${args.numQuestions} questions - count them Q1 to Q${args.numQuestions} and do not stop early. You MUST try to reach the full count; if you would normally stop at 4-6, keep going, use different spans, dates, relations, and examples from the full page to fill the rest.${isAdvanced ? " Mix: 50% short, 25% mcq, 25% fill" : " Mix: ~33% mcq, ~33% fill, ~33% short"}, interleaved (mcq, fill, short, repeat, never 3 of same type in a row).${isAdvanced ? " For advanced, at least half must be synthesis and application: give a new scenario and ask what the principle would say, compare formulations, ask why a maxim fails. Don't stay on simple recall. Never put the answer in parentheses inside an mcq option, and all 4 mcq options must be same type as the answer (all years if answer is a year)." : " For default/basic, keep the mix but really push to the full count; use synthesis and dating too where possible, just lighter."} Return markdown only. Answer must be bare phrase, never prefixed with "A. " or "B. " - just the phrase.`,
   };
 }
 
