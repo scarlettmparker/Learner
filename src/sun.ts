@@ -1,28 +1,15 @@
 import chalk from "chalk";
-import { executeGraphQL } from "./auth.js";
-import {
-  BlogPostTypesDocument,
-  type BlogPostTypesQuery,
-  ChildrenDocument,
-  type ChildrenQuery,
-  type ChildrenQueryVariables,
-  CreateBlogPostDocument,
-  type CreateBlogPostMutation,
-  type CreateBlogPostMutationVariables,
-  ListBlogPostsDocument,
-  type ListBlogPostsQuery,
-  type ListBlogPostsQueryVariables,
-  LocateBlogPostDocument,
-  type LocateBlogPostQuery,
-  type LocateBlogPostQueryVariables,
-  UpdateBlogPostDocument,
-  type UpdateBlogPostMutation,
-  type UpdateBlogPostMutationVariables,
-  WikipediaSearchDocument,
-  type WikipediaSearchQuery,
-  type WikipediaSearchQueryVariables,
-} from "./generated/graphql.js";
+import { FilterOperator, SortDirection } from "./generated/graphql.js";
 import { promptInput } from "./quiz/prompt.js";
+import {
+  createBlogPost as apiCreateBlogPost,
+  listBlogPosts as apiListBlogPosts,
+  listBlogPostTypes as apiListBlogPostTypes,
+  listChildrenPaged as apiChildren,
+  locateBlogPost as apiLocateBlogPost,
+  updateBlogPost as apiUpdateBlogPost,
+  wikipediaSearch as apiWikipediaSearch,
+} from "./api.js";
 
 export type KnowledgeParent = {
   /**
@@ -86,14 +73,16 @@ function toParent(item: { id: string; title: string }): KnowledgeParent {
  * @param token - auth token
  * @returns type id
  */
-async function resolveTypeId(parentTypeName: string | null | undefined, token: string): Promise<string> {
+async function resolveTypeId(
+  parentTypeName: string | null | undefined,
+  token: string,
+): Promise<string> {
+  const types = await apiListBlogPostTypes(token);
   if (parentTypeName) {
-    const typeData = await executeGraphQL<BlogPostTypesQuery>(BlogPostTypesDocument, {}, token);
-    const found = typeData?.blogQueries?.blogPostTypes?.find((t) => t.name === parentTypeName);
+    const found = types?.find((t) => t.name === parentTypeName);
     if (found) return found.id;
   }
-  const typeData = await executeGraphQL<BlogPostTypesQuery>(BlogPostTypesDocument, {}, token);
-  const knowledge = typeData?.blogQueries?.blogPostTypes?.find((t) => t.name === "KNOWLEDGE");
+  const knowledge = types?.find((t) => t.name === "KNOWLEDGE");
   if (!knowledge) throw new Error("KNOWLEDGE type not found");
   return knowledge.id;
 }
@@ -105,7 +94,10 @@ async function resolveTypeId(parentTypeName: string | null | undefined, token: s
  * @param suggested - suggested parent if any
  * @returns display label
  */
-function displayForParent(parent: KnowledgeParent, suggested: KnowledgeParent | null): string {
+function displayForParent(
+  parent: KnowledgeParent,
+  suggested: KnowledgeParent | null,
+): string {
   const isSuggested = parent.id === suggested?.id;
   return isSuggested ? `${parent.title} (suggested)` : parent.title;
 }
@@ -113,64 +105,65 @@ function displayForParent(parent: KnowledgeParent, suggested: KnowledgeParent | 
 /**
  * Lists top-level KNOWLEDGE parents.
  */
-export async function listKnowledgeParents(token: string): Promise<KnowledgeParent[]> {
-  const data = await executeGraphQL<ListBlogPostsQuery>(
-    ListBlogPostsDocument,
+export async function listKnowledgeParents(
+  token: string,
+): Promise<KnowledgeParent[]> {
+  const paged = await apiListBlogPosts(
     {
-      pagination: {
-        size: 50,
-        filters: [{ field: "type.name", operator: "EQUALS", value: "KNOWLEDGE" }],
-        sorts: [{ field: "lastUpdatedAt", dir: "DESC" }],
-      },
-    } as ListBlogPostsQueryVariables,
+      size: 50,
+      filters: [{ field: "type.name", operator: FilterOperator.Equals, value: "KNOWLEDGE" }],
+      sorts: [{ field: "lastUpdatedAt", dir: SortDirection.Desc }],
+    },
     token,
   );
-  const items = data?.blogQueries?.listBlogPosts?.items ?? [];
-  return items.map(toParent);
+  return (paged.items ?? []).map(toParent);
 }
 
 /**
  * Lists children of a parent.
  */
-export async function listChildren(parentId: string, token: string): Promise<KnowledgeParent[]> {
-  const data = await executeGraphQL<ChildrenQuery>(
-    ChildrenDocument,
-    { parentId, pagination: { size: 50 } } as ChildrenQueryVariables,
+export async function listChildren(
+  parentId: string,
+  token: string,
+): Promise<KnowledgeParent[]> {
+  const paged = await apiChildren(
+    parentId,
+    { size: 50 },
     token,
   );
-  const items = data?.blogQueries?.children?.items ?? [];
-  return items.map(toParent);
+  return (paged.items ?? []).map(toParent);
 }
 
 /**
  * Finds parent by fuzzy MATCHES title under KNOWLEDGE.
  */
-export async function findParentByTitleFuzzy(title: string, token: string): Promise<KnowledgeParent | null> {
-  const data = await executeGraphQL<ListBlogPostsQuery>(
-    ListBlogPostsDocument,
+export async function findParentByTitleFuzzy(
+  title: string,
+  token: string,
+): Promise<KnowledgeParent | null> {
+  const paged = await apiListBlogPosts(
     {
-      pagination: {
-        size: 10,
-        filters: [
-          { field: "type.name", operator: "EQUALS", value: "KNOWLEDGE" },
-          { field: "title", operator: "MATCHES", value: title },
-        ],
-      },
-    } as ListBlogPostsQueryVariables,
+      size: 10,
+      filters: [
+        { field: "type.name", operator: FilterOperator.Equals, value: "KNOWLEDGE" },
+        { field: "title", operator: FilterOperator.Matches, value: title },
+      ],
+    },
     token,
   );
-  const items = data?.blogQueries?.listBlogPosts?.items ?? [];
-  const first = items[0];
+  const first = (paged.items ?? [])[0];
   return first ? toParent(first) : null;
 }
 
 /**
  * Creates a child blog under parent (or top-level if parentId null).
  */
-export async function createChildBlog(params: CreateChildParams, token: string): Promise<string> {
+export async function createChildBlog(
+  params: CreateChildParams,
+  token: string,
+): Promise<string> {
   const typeId = await resolveTypeId(params.parentTypeName, token);
-  const data = await executeGraphQL<CreateBlogPostMutation>(
-    CreateBlogPostDocument,
+  const result = await apiCreateBlogPost(
     {
       title: params.title,
       input: {
@@ -181,12 +174,13 @@ export async function createChildBlog(params: CreateChildParams, token: string):
         tags: ["learn", "wikipedia"],
         remoteObject: [],
       },
-    } as CreateBlogPostMutationVariables,
+    },
     token,
   );
-  const result = data?.blogMutations?.createBlogPost;
   if (!result || result.__typename !== "QuerySuccess" || !result.id) {
-    throw new Error((result as { message?: string })?.message ?? "Failed to create blog post");
+    throw new Error(
+      (result as { message?: string })?.message ?? "Failed to create blog post",
+    );
   }
   return result.id;
 }
@@ -200,16 +194,15 @@ export async function findExistingChildByTopic(
   token: string,
 ): Promise<{ id: string; title: string; content: string | null } | null> {
   if (!parentId) return null;
-  const children = await listChildren(parentId, token);
-  const lowerTopic = topic.toLowerCase();
-  const match = children.find((c) => c.title.toLowerCase().startsWith(lowerTopic));
-  if (!match) return null;
-  const data = await executeGraphQL<LocateBlogPostQuery>(
-    LocateBlogPostDocument,
-    { id: match.id } as LocateBlogPostQueryVariables,
+  const paged = await apiChildren(
+    parentId,
+    { size: 5, filters: [{ field: "title", operator: FilterOperator.StartsWith, value: topic }] },
     token,
   );
-  const post = data?.blogQueries?.locateBlogPost;
+  const items = paged.items ?? [];
+  const match = items[0];
+  if (!match) return null;
+  const post = await apiLocateBlogPost(match.id, token);
   if (!post) return null;
   return { id: post.id, title: post.title, content: post.content ?? null };
 }
@@ -217,15 +210,16 @@ export async function findExistingChildByTopic(
 /**
  * Updates existing blog content with new markdown.
  */
-export async function updateBlog(id: string, newContent: string, token: string): Promise<string> {
-  const data = await executeGraphQL<UpdateBlogPostMutation>(
-    UpdateBlogPostDocument,
-    { id, input: { content: newContent } } as UpdateBlogPostMutationVariables,
-    token,
-  );
-  const result = data?.blogMutations?.updateBlogPost;
+export async function updateBlog(
+  id: string,
+  newContent: string,
+  token: string,
+): Promise<string> {
+  const result = await apiUpdateBlogPost({ id, input: { content: newContent } }, token);
   if (!result || result.__typename !== "QuerySuccess" || !result.id) {
-    throw new Error((result as { message?: string })?.message ?? "Failed to update blog post");
+    throw new Error(
+      (result as { message?: string })?.message ?? "Failed to update blog post",
+    );
   }
   return result.id;
 }
@@ -272,16 +266,24 @@ export async function findBestParentByWikiExtract(
  * @param suggested - suggested parent to order first
  * @returns display choices
  */
-function buildParentChoices(parents: KnowledgeParent[], suggested: KnowledgeParent | null) {
+function buildParentChoices(
+  parents: KnowledgeParent[],
+  suggested: KnowledgeParent | null,
+) {
   let ordered = parents;
-  if (suggested) ordered = [suggested, ...parents.filter((p) => p.id !== suggested.id)];
+  if (suggested)
+    ordered = [suggested, ...parents.filter((p) => p.id !== suggested.id)];
   return [
     ...ordered.map((p) => ({
       display: displayForParent(p, suggested),
       value: p.id,
       title: p.title,
     })),
-    { display: "[Create new top-level KNOWLEDGE]", value: null as string | null, title: null as string | null },
+    {
+      display: "[Create new top-level KNOWLEDGE]",
+      value: null as string | null,
+      title: null as string | null,
+    },
   ];
 }
 
@@ -312,7 +314,8 @@ export async function pickParentInteractive(
       message: `Drill into "${chosen.display}"?`,
       choices: ["Select this one", ...children.map((c) => c.title), "[Back]"],
     });
-    if (action === "Select this one") return { id: chosen.value, title: chosen.title };
+    if (action === "Select this one")
+      return { id: chosen.value, title: chosen.title };
     if (action === "[Back]") return pickParentInteractive(token, suggested);
     const child = children.find((c) => c.title === action);
     if (child) return { id: child.id, title: child.title };
@@ -323,11 +326,22 @@ export async function pickParentInteractive(
 /**
  * Fetches prior context for a topic from KNOWLEDGE titles.
  */
-export async function fetchPriorContext(topic: string, token: string): Promise<string> {
+export async function fetchPriorContext(
+  topic: string,
+  token: string,
+): Promise<string> {
   try {
-    const parents = await listKnowledgeParents(token);
-    const candidates = parents.filter((p) => p.title.toLowerCase().includes(topic.toLowerCase())).slice(0, 3);
-    return candidates.map((c) => c.title).join(", ");
+    const paged = await apiListBlogPosts(
+      {
+        size: 3,
+        filters: [
+          { field: "type.name", operator: FilterOperator.Equals, value: "KNOWLEDGE" },
+          { field: "title", operator: FilterOperator.Matches, value: topic },
+        ],
+      },
+      token,
+    );
+    return (paged.items ?? []).map((c) => c.title).join(", ");
   } catch {
     return "";
   }
@@ -342,12 +356,7 @@ export async function fetchAdvancedTopics(
   limit = 3,
 ): Promise<string[]> {
   try {
-    const data = await executeGraphQL<WikipediaSearchQuery>(
-      WikipediaSearchDocument,
-      { query: topic } as WikipediaSearchQueryVariables,
-      token,
-    );
-    const results = data?.wikiQueries?.wikipediaSearch ?? [];
+    const results = await apiWikipediaSearch(topic, token);
     return results
       .map((r) => r.title)
       .filter((t) => t.toLowerCase() !== topic.toLowerCase())

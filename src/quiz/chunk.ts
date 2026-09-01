@@ -47,11 +47,16 @@ export function sampleChunksForQuiz(
   const scored = chunks.map((c, idx) => {
     const lower = c.toLowerCase();
     let score = 0;
-    if (priorLower.includes(lower.slice(0, 80).toLowerCase())) score += 1;
-    score += Math.random() * 0.5;
+    if (lower.includes("what was researched") || lower.includes("what i answered")) {
+      score += 2;
+    }
+    if (priorLower && priorLower.length > 10 && lower.includes(priorLower.slice(0, 40).toLowerCase())) {
+      score -= 0.5;
+    }
+    score += Math.random() * 0.1;
     return { idx, score, text: c };
   });
-  scored.sort((a, b) => a.score - b.score);
+  scored.sort((a, b) => b.score - a.score);
   const sampled = scored.slice(0, count).sort((a, b) => a.idx - b.idx).map((s) => s.text);
   return sampled.join("\n\n---\n\n");
 }

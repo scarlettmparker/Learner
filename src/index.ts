@@ -10,6 +10,8 @@ import {
   fetchWikipediaSummary,
   searchWikipedia,
 } from "./sources/wikipedia.js";
+import { FilterOperator } from "./generated/graphql.js";
+import { listBlogPosts as apiListBlogPosts, listChildrenPaged as apiListChildrenPaged } from "./api.js";
 import {
   createChildBlog,
   fetchAdvancedTopics,
@@ -29,6 +31,7 @@ import { generateQuiz } from "./quiz/generate.js";
 import { buildMarkdown } from "./quiz/markdown.js";
 import { runQuiz } from "./quiz/run.js";
 import { promptInput } from "./quiz/prompt.js";
+import { extractPriorQA } from "./quiz/blog-extract.js";
 
 type LearnOptions = {
   /**
@@ -241,16 +244,15 @@ async function gatherBlogContext(
  */
 async function findExistingAcrossKnowledge(topic: string, token: string) {
   try {
-    const parents = await listKnowledgeParents(token);
-    const lower = topic.toLowerCase();
-    for (const p of parents) {
-      if (p.title.toLowerCase().includes(lower)) return p;
-      const children = await listChildren(p.id, token).catch(() => []);
-      const match = children.find((c) =>
-        c.title.toLowerCase().startsWith(lower),
-      );
-      if (match) return match;
-    }
+    const paged = await apiListBlogPosts(
+      {
+        size: 5,
+        filters: [{ field: "title", operator: FilterOperator.Matches, value: topic }],
+      },
+      token,
+    );
+    const first = (paged.items ?? [])[0];
+    if (first) return { id: first.id, title: first.title };
   } catch {
     // ignore
   }
@@ -540,6 +542,25 @@ async function runLearnSession(
     startDifficulty,
   );
   const combinedPrior = blogCtx.priorContext;
+  const priorQA = blogCtx.existingForContext?.content
+    ? extractPriorQA(blogCtx.existingForContext.content)
+    : [];
+  const morePaged = parentChoice.id
+    ? await apiListChildrenPaged(
+        parentChoice.id,
+        { size: 10, filters: [{ field: "title", operator: FilterOperator.Matches, value: normalizedTopic }] },
+        token,
+      ).catch(() => null)
+    : null;
+  const relatedBlogs = (morePaged?.items ?? []).map((c) => ({ id: c.id, title: c.title }));
+  const extraPriorQA = relatedBlogs
+    .slice(0, 3)
+    .flatMap((c) => (c as unknown as { content?: string }).content ? extractPriorQA((c as unknown as { content: string }).content) : []);
+  const allPriorQA = [...priorQA, ...extraPriorQA];
+  const priorAnswersMarkdown = allPriorQA
+    .map((qa) => `Q: ${qa.question} | A: ${qa.answer} | Detail: ${qa.detail}`)
+    .join("\n");
+  const priorAnswerSet = allPriorQA.map((qa) => qa.answer);
   const quiz = await withThinking(
     `Thinking - generating quiz (~${numQuestions} questions, ${difficulty})...`,
     () =>
@@ -548,6 +569,8 @@ async function runLearnSession(
         summary: wiki.summary as NonNullable<WikiBucket["summary"]>,
         related: wiki.related,
         priorContext: combinedPrior,
+        priorAnswersMarkdown,
+        priorAnswerSet,
         numQuestions,
         fullPage: sampledForQuiz || wiki.fullPage,
         difficulty,

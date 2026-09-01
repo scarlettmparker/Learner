@@ -1,16 +1,9 @@
-import { parse } from "graphql";
-import { executeGraphQL } from "../auth.js";
 import {
-  WikipediaRelatedTopicsDocument,
-  type WikipediaRelatedTopicsQuery,
-  type WikipediaRelatedTopicsQueryVariables,
-  WikipediaSearchDocument,
-  type WikipediaSearchQuery,
-  type WikipediaSearchQueryVariables,
-  WikipediaSummaryDocument,
-  type WikipediaSummaryQuery,
-  type WikipediaSummaryQueryVariables,
-} from "../generated/graphql.js";
+  wikipediaPage as apiWikipediaPage,
+  wikipediaRelatedTopics as apiWikipediaRelatedTopics,
+  wikipediaSearch as apiWikipediaSearch,
+  wikipediaSummary as apiWikipediaSummary,
+} from "../api.js";
 
 export type WikiSummary = {
   /**
@@ -46,19 +39,7 @@ export type RelatedTopic = {
   extract?: string | null;
 };
 
-type WikipediaPageQuery = {
-  wikiQueries: {
-    wikipediaPage: string | null;
-  };
-};
 
-type WikipediaPageVariables = {
-  title: string;
-};
-
-const WikipediaPageDocument = parse(
-  "query wikipediaPage($title: String!) { wikiQueries { wikipediaPage(title: $title) } }",
-);
 
 /**
  * Encodes wiki URL parens for markdown safety.
@@ -104,12 +85,7 @@ export async function searchWikipedia(
   query: string,
   token: string,
 ): Promise<WikiSummary[]> {
-  const data = await executeGraphQL<WikipediaSearchQuery>(
-    WikipediaSearchDocument,
-    { query } as WikipediaSearchQueryVariables,
-    token,
-  );
-  const results = data.wikiQueries?.wikipediaSearch ?? [];
+  const results = await apiWikipediaSearch(query, token);
   return results
     .map((r) => mapSummary(r as never, r.title))
     .filter((r): r is WikiSummary => r !== null);
@@ -122,12 +98,7 @@ export async function fetchWikipediaSummary(
   topic: string,
   token: string,
 ): Promise<WikiSummary | null> {
-  const data = await executeGraphQL<WikipediaSummaryQuery>(
-    WikipediaSummaryDocument,
-    { title: topic } as WikipediaSummaryQueryVariables,
-    token,
-  );
-  const summary = data.wikiQueries?.wikipediaSummary;
+  const summary = await apiWikipediaSummary(topic, token);
   if (summary?.extract) {
     const mapped = mapSummary(summary as never, topic);
     if (mapped) return mapped;
@@ -144,15 +115,7 @@ export async function fetchWikipediaPage(
   topic: string,
   token: string,
 ): Promise<string | null> {
-  const data = await executeGraphQL<WikipediaPageQuery>(
-    WikipediaPageDocument as never,
-    { title: topic } as WikipediaPageVariables as unknown as Record<
-      string,
-      unknown
-    >,
-    token,
-  );
-  const text = data.wikiQueries?.wikipediaPage;
+  const text = await apiWikipediaPage(topic, token);
   if (!text || !text.trim()) return null;
   return text;
 }
@@ -164,12 +127,8 @@ export async function fetchRelatedTopics(
   topic: string,
   token: string,
 ): Promise<RelatedTopic[]> {
-  const data = await executeGraphQL<WikipediaRelatedTopicsQuery>(
-    WikipediaRelatedTopicsDocument,
-    { title: topic } as WikipediaRelatedTopicsQueryVariables,
-    token,
-  );
-  return (data.wikiQueries?.wikipediaRelatedTopics ?? []).map((r) => ({
+  const topics = await apiWikipediaRelatedTopics(topic, token);
+  return topics.map((r) => ({
     title: r.title,
     pageUrl: encodeWikiUrl(r.pageUrl),
     extract: r.extract ?? null,

@@ -16,11 +16,12 @@ Must load `anti-ai-slop-writing` `references/banned-words.md` before writing. Ke
 - Same normalized answer after lowercasing and singularising. "motivation" vs "motivations" is the same.
 - Stem that contains another question's answer. If you asked "who introduced concept X" then a later stem says "the introduction of concept X", that leaks.
 - Stem that contains its own answer. If the stem lists the answer among alternatives and then asks for it, or repeats the answer as a whole word or phrase before the blank, that leaks. Check case-insensitive, singular and plural, and split hyphenated compounds. The blank must be the only place the answer appears.
+- Same fact already in Prior blog `What I answered | Detail` rows. If the blog already asked it and got it correct, asking it again is a duplicate.
+- Hallucinated answer not in Wiki extract, Full page excerpt, or Prior blog content. If it is not a substring of that source, it is not a duplicate, it is invalid.
 
-## How to fix, fast, no LLM retry
+## How to fix
 
-- Don't re-ask the model. Filter locally with `areExplanationsOverlapping` from `@sun/utils/nlp` (Jaccard ≥0.6 or 6-token run) and answer/stem equality. Keep the first occurrence, drop the later one. If you drop, don't pad with a near-copy. Leave the quiz one short or pull from a different paragraph instead.
-- When you draft, pick a different sentence or a different paragraph for each `Explain`. If you've used a sentence, you can't reuse it even with a different blank.
+- When you draft, pick a different Source Span or subphrase for each `Explain`. If you've used a span, you can't reuse it even with a different blank. Code will re-prompt until N distinct spans are covered, so select distinct spans the first time.
 
 ## Heuristic
 

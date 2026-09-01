@@ -5,7 +5,7 @@ description: Use when fetching Wikipedia context via Sun GraphQL for Learner. Wr
 
 # Wiki context fetcher
 
-Wraps Sun's `wikiQueries` via `executeGraphQL` with `X-Forwarded-For` headers (see `src/auth.ts`). Never synthesize `WikiSummary` from blog data - blog content only enters via `priorContext` labelled explicitly.
+Wraps Sun's `wikiQueries` via `executeGraphQL` with `X-Forwarded-For` headers (see `src/auth.ts`). Never synthesize `WikiSummary` from blog data - blog content only enters via `priorContext` and `priorAnswersMarkdown` labelled explicitly. Helpers in `src/quiz/blog-extract.ts` extract prior Q&A as objects for clean passing.
 
 Operations:
 
