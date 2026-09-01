@@ -11,8 +11,12 @@ import {
   searchWikipedia,
 } from "./sources/wikipedia.js";
 import { FilterOperator } from "./generated/graphql.js";
-import { listBlogPosts as apiListBlogPosts, listChildrenPaged as apiListChildrenPaged } from "./api.js";
 import {
+  listBlogPosts as apiListBlogPosts,
+  listChildrenPaged as apiListChildrenPaged,
+} from "./api.js";
+import {
+  BlogPostTypeName,
   createChildBlog,
   fetchAdvancedTopics,
   fetchPriorContext,
@@ -23,7 +27,6 @@ import {
   listChildren,
   listKnowledgeParents,
   pickParentInteractive,
-  updateBlog,
 } from "./sun.js";
 import { withThinking } from "./ui/thinking.js";
 import { generateQuiz } from "./quiz/generate.js";
@@ -31,6 +34,7 @@ import { buildMarkdown } from "./quiz/markdown.js";
 import { runQuiz } from "./quiz/run.js";
 import { promptInput } from "./quiz/prompt.js";
 import { extractPriorQA } from "./quiz/blog-extract.js";
+import { bulkCreateQuestions, listQuestions, submitAnswer } from "./jocasta.js";
 
 type LearnOptions = {
   /**
@@ -246,7 +250,9 @@ async function findExistingAcrossKnowledge(topic: string, token: string) {
     const paged = await apiListBlogPosts(
       {
         size: 5,
-        filters: [{ field: "title", operator: FilterOperator.Matches, value: topic }],
+        filters: [
+          { field: "title", operator: FilterOperator.Matches, value: topic },
+        ],
       },
       token,
     );
@@ -299,7 +305,7 @@ function resolveDifficultyAndCount(
 }
 
 /**
- * Creates or updates blog and returns link.
+ * Creates a STUDY blog for an attempt.
  *
  * @param topic - topic
  * @param parentChoice - parent
@@ -308,11 +314,10 @@ function resolveDifficultyAndCount(
  * @param gaps - gaps
  * @param related - related topics
  * @param fullPage - full page excerpt
- * @param mastery - whether mastery
  * @param token - auth token
  * @returns new blog id
  */
-async function createOrUpdateBlog(
+async function createStudyBlog(
   topic: string,
   parentChoice: ParentChoice,
   summary: NonNullable<WikiBucket["summary"]>,
@@ -320,38 +325,8 @@ async function createOrUpdateBlog(
   gaps: string[],
   related: WikiBucket["related"],
   fullPage: string | null,
-  mastery: boolean,
   token: string,
 ): Promise<string> {
-  const existing = await findExistingChildByTopic(
-    parentChoice.id,
-    summary.title,
-    token,
-  );
-  if (existing) {
-    console.log(
-      chalk.dim(
-        `Found existing "${existing.title}" - updating with new attempt...`,
-      ),
-    );
-    const dateHeader = `\n---\n### ${formatTitleWithDate(summary.title)}\n`;
-    const newSection = buildMarkdown(
-      {
-        topic,
-        summary,
-        fullPage,
-        answers,
-        gaps,
-        related,
-        pageUrl: summary.pageUrl,
-        mastery,
-      },
-      { includeResearch: false },
-    );
-    const updatedContent = `${existing.content ?? ""}${dateHeader}${newSection}`;
-    const newId = await updateBlog(existing.id, updatedContent, token);
-    return newId;
-  }
   const titleWithDate = formatTitleWithDate(summary.title);
   const markdown = buildMarkdown(
     {
@@ -362,16 +337,15 @@ async function createOrUpdateBlog(
       gaps,
       related,
       pageUrl: summary.pageUrl,
-      mastery,
     },
-    { includeResearch: true },
+    { includeResearch: false },
   );
   const newId = await createChildBlog(
     {
       title: titleWithDate,
       content: markdown,
       parentId: parentChoice.id,
-      parentTypeName: parentChoice.title,
+      parentTypeName: BlogPostTypeName.Study,
     },
     token,
   );
@@ -543,14 +517,30 @@ async function runLearnSession(
   const morePaged = parentChoice.id
     ? await apiListChildrenPaged(
         parentChoice.id,
-        { size: 10, filters: [{ field: "title", operator: FilterOperator.Matches, value: normalizedTopic }] },
+        {
+          size: 10,
+          filters: [
+            {
+              field: "title",
+              operator: FilterOperator.Matches,
+              value: normalizedTopic,
+            },
+          ],
+        },
         token,
       ).catch(() => null)
     : null;
-  const relatedBlogs = (morePaged?.items ?? []).map((c) => ({ id: c.id, title: c.title }));
+  const relatedBlogs = (morePaged?.items ?? []).map((c) => ({
+    id: c.id,
+    title: c.title,
+  }));
   const extraPriorQA = relatedBlogs
     .slice(0, 3)
-    .flatMap((c) => (c as unknown as { content?: string }).content ? extractPriorQA((c as unknown as { content: string }).content) : []);
+    .flatMap((c) =>
+      (c as unknown as { content?: string }).content
+        ? extractPriorQA((c as unknown as { content: string }).content)
+        : [],
+    );
   const allPriorQA = [...priorQA, ...extraPriorQA];
   const priorAnswersMarkdown = allPriorQA
     .map((qa) => `Q: ${qa.question} | A: ${qa.answer} | Detail: ${qa.detail}`)
@@ -587,14 +577,13 @@ async function runLearnSession(
           gaps,
           related: wiki.related,
           pageUrl: wiki.summary!.pageUrl,
-          mastery: readinessReady,
         },
         { includeResearch: true },
       ),
     );
     return;
   }
-  const newId = await createOrUpdateBlog(
+  const newId = await createStudyBlog(
     normalizedTopic,
     parentChoice,
     wiki.summary as NonNullable<WikiBucket["summary"]>,
@@ -602,19 +591,72 @@ async function runLearnSession(
     gaps,
     wiki.related,
     fullPageEnriched || wiki.fullPage,
-    readinessReady,
     token,
   );
-  const isUpdate = Boolean(blogCtx.existingForContext);
-  const displayTitle = isUpdate
-    ? (blogCtx.existingForContext as { title: string }).title
-    : formatTitleWithDate(normalizedTopic);
+  const displayTitle = formatTitleWithDate(normalizedTopic);
   console.log(
-    chalk.green(
-      `\n${isUpdate ? "Updated" : "Created"} blog "${displayTitle}" -> /blog/${newId}`,
-    ),
+    chalk.green(`\nCreated STUDY blog "${displayTitle}" -> /blog/${newId}`),
   );
   printBlogLink(newId, displayTitle);
+
+  // Persist only blanks/short as concrete Question objects (mcq stays markdown-only).
+  const toPersist = quiz.questions.filter((q) => q.type !== "mcq");
+  if (toPersist.length) {
+    const knowledgeRemote = parentChoice.id
+      ? `briareus:post:${parentChoice.id}`
+      : null;
+    const studyRemote = `briareus:post:${newId}`;
+    const inputs = toPersist.map((q) => ({
+      stem: q.stem,
+      answer: q.answer,
+      explanation: q.explanation ?? "",
+      remoteObject: knowledgeRemote
+        ? [studyRemote, knowledgeRemote]
+        : [studyRemote],
+    }));
+    try {
+      const bulk = await bulkCreateQuestions(inputs, token);
+      // Bulk returns single id on QuerySuccess; fetch created questions via remoteObject to get ids.
+      const created = await listQuestions(
+        studyRemote,
+        { size: inputs.length },
+        token,
+      ).catch(() => null);
+      const questions = created?.items ?? [];
+      for (let i = 0; i < questions.length && i < answers.length; i++) {
+        const q = questions[i];
+        const a = answers.find((ans) => ans.question === q.stem);
+        if (!a) continue;
+        await submitAnswer(
+          q.id,
+          {
+            myAnswer: a.myAnswer,
+            correct: a.correct,
+            correctAnswer: a.correctAnswer,
+          },
+          token,
+        ).catch(() => {});
+      }
+      if (
+        bulk &&
+        (bulk as { __typename?: string }).__typename === "StandardError"
+      ) {
+        console.log(
+          chalk.yellow(
+            `Jocasta bulk create warning: ${(bulk as { message?: string }).message}`,
+          ),
+        );
+      } else {
+        console.log(
+          chalk.dim(`Persisted ${inputs.length} questions to Jocasta`),
+        );
+      }
+    } catch (e) {
+      console.log(
+        chalk.yellow(`Jocasta persist skipped: ${(e as Error).message}`),
+      );
+    }
+  }
   presentRelatedOverview(wiki.related, wiki.searchResults);
   const { nextTopic, nextDifficulty } = await promptRecurring(wiki.related);
   if (!nextTopic) {

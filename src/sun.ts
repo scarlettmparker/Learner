@@ -37,6 +37,27 @@ export type PickParentResult = {
   title: string | null;
 };
 
+// "Types" are actual objects (BlogPostType) and not enums, so we define a string enum for
+// known types for a bit of type safety
+export enum BlogPostTypeName {
+  /**
+   * Knowledge blog type.
+   */
+  Knowledge = "KNOWLEDGE",
+  /**
+   * Study blog type.
+   */
+  Study = "STUDY",
+  /**
+   * Review blog type.
+   */
+  Review = "REVIEW",
+  /**
+   * Docs blog type.
+   */
+  Docs = "DOCS",
+}
+
 type CreateChildParams = {
   /**
    * Title with date.
@@ -51,9 +72,9 @@ type CreateChildParams = {
    */
   parentId: string | null;
   /**
-   * Parent type name for type resolution.
+   * Blog post type name for type resolution.
    */
-  parentTypeName?: string | null;
+  parentTypeName?: BlogPostTypeName | null;
 };
 
 /**
@@ -67,14 +88,14 @@ function toParent(item: { id: string; title: string }): KnowledgeParent {
 }
 
 /**
- * Resolves type id for KNOWLEDGE or parent type.
+ * Resolves type id for the requested blog post type.
  *
- * @param parentTypeName - optional parent type name
+ * @param parentTypeName - optional blog post type name
  * @param token - auth token
  * @returns type id
  */
 async function resolveTypeId(
-  parentTypeName: string | null | undefined,
+  parentTypeName: BlogPostTypeName | null | undefined,
   token: string,
 ): Promise<string> {
   const types = await apiListBlogPostTypes(token);
@@ -82,7 +103,7 @@ async function resolveTypeId(
     const found = types?.find((t) => t.name === parentTypeName);
     if (found) return found.id;
   }
-  const knowledge = types?.find((t) => t.name === "KNOWLEDGE");
+  const knowledge = types?.find((t) => t.name === BlogPostTypeName.Knowledge);
   if (!knowledge) throw new Error("KNOWLEDGE type not found");
   return knowledge.id;
 }
@@ -111,7 +132,13 @@ export async function listKnowledgeParents(
   const paged = await apiListBlogPosts(
     {
       size: 50,
-      filters: [{ field: "type.name", operator: FilterOperator.Equals, value: "KNOWLEDGE" }],
+      filters: [
+        {
+          field: "type.name",
+          operator: FilterOperator.Equals,
+          value: BlogPostTypeName.Knowledge,
+        },
+      ],
       sorts: [{ field: "lastUpdatedAt", dir: SortDirection.Desc }],
     },
     token,
@@ -126,11 +153,7 @@ export async function listChildren(
   parentId: string,
   token: string,
 ): Promise<KnowledgeParent[]> {
-  const paged = await apiChildren(
-    parentId,
-    { size: 50 },
-    token,
-  );
+  const paged = await apiChildren(parentId, { size: 50 }, token);
   return (paged.items ?? []).map(toParent);
 }
 
@@ -145,7 +168,11 @@ export async function findParentByTitleFuzzy(
     {
       size: 10,
       filters: [
-        { field: "type.name", operator: FilterOperator.Equals, value: "KNOWLEDGE" },
+        {
+          field: "type.name",
+          operator: FilterOperator.Equals,
+          value: BlogPostTypeName.Knowledge,
+        },
         { field: "title", operator: FilterOperator.Matches, value: title },
       ],
     },
@@ -196,7 +223,12 @@ export async function findExistingChildByTopic(
   if (!parentId) return null;
   const paged = await apiChildren(
     parentId,
-    { size: 5, filters: [{ field: "title", operator: FilterOperator.StartsWith, value: topic }] },
+    {
+      size: 5,
+      filters: [
+        { field: "title", operator: FilterOperator.StartsWith, value: topic },
+      ],
+    },
     token,
   );
   const items = paged.items ?? [];
@@ -215,7 +247,10 @@ export async function updateBlog(
   newContent: string,
   token: string,
 ): Promise<string> {
-  const result = await apiUpdateBlogPost({ id, input: { content: newContent } }, token);
+  const result = await apiUpdateBlogPost(
+    { id, input: { content: newContent } },
+    token,
+  );
   if (!result || result.__typename !== "QuerySuccess" || !result.id) {
     throw new Error(
       (result as { message?: string })?.message ?? "Failed to update blog post",
@@ -335,7 +370,11 @@ export async function fetchPriorContext(
       {
         size: 3,
         filters: [
-          { field: "type.name", operator: FilterOperator.Equals, value: "KNOWLEDGE" },
+          {
+            field: "type.name",
+            operator: FilterOperator.Equals,
+            value: BlogPostTypeName.Knowledge,
+          },
           { field: "title", operator: FilterOperator.Matches, value: topic },
         ],
       },
