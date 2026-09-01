@@ -1,0 +1,13 @@
+mutation SubmitAnswer($questionId: ID!, $input: AnswerInput!) {
+  questionMutations {
+    submitAnswer(questionId: $questionId, input: $input) {
+      ... on QuerySuccess {
+        message
+        id
+      }
+      ... on StandardError {
+        message
+      }
+    }
+  }
+}

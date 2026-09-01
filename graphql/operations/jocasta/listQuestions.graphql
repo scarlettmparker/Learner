@@ -1,0 +1,22 @@
+query ListQuestions($remoteObject: String, $pagination: PaginationInput) {
+  questionQueries {
+    listQuestions(remoteObject: $remoteObject, pagination: $pagination) {
+      items {
+        id
+        stem
+        answer
+        explanation
+        remoteObject
+        createdAt
+      }
+      pageInfo {
+        page
+        size
+        totalPages
+        totalCount
+        hasNextPage
+        hasPreviousPage
+      }
+    }
+  }
+}

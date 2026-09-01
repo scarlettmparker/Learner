@@ -1,0 +1,60 @@
+type Question {
+  id: ID!
+  stem: String!
+  answer: String!
+  explanation: String
+  remoteObject: [String!]!
+  createdAt: DateTime!
+}
+
+type Answer {
+  id: ID!
+  questionId: ID!
+  myAnswer: String!
+  correct: Boolean!
+  correctAnswer: String!
+  createdAt: DateTime!
+}
+
+input QuestionInput {
+  stem: String!
+  answer: String!
+  explanation: String
+  remoteObject: [String!]
+}
+
+type PagedQuestions {
+  items: [Question!]!
+  pageInfo: PageInfo!
+}
+
+type PagedAnswers {
+  items: [Answer!]!
+  pageInfo: PageInfo!
+}
+
+type QuestionQueries {
+  listQuestions(remoteObject: String, pagination: PaginationInput): PagedQuestions!
+  locateQuestion(id: ID!): Question
+  listAnswers(questionId: ID!, pagination: PaginationInput): PagedAnswers!
+}
+
+input AnswerInput {
+  myAnswer: String!
+  correct: Boolean!
+  correctAnswer: String!
+}
+
+type QuestionMutations {
+  bulkCreateQuestions(inputs: [QuestionInput!]!): QueryResult
+  submitAnswer(questionId: ID!, input: AnswerInput!): QueryResult
+  linkQuestion(questionId: ID!, target: String!): QueryResult
+}
+
+extend type Query {
+  questionQueries: QuestionQueries!
+}
+
+extend type Mutation {
+  questionMutations: QuestionMutations!
+}

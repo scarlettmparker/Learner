@@ -37,6 +37,22 @@ export enum AccountStatus {
   Suspended = 'SUSPENDED'
 }
 
+export type Answer = {
+  __typename?: 'Answer';
+  correct: Scalars['Boolean']['output'];
+  correctAnswer: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  id: Scalars['ID']['output'];
+  myAnswer: Scalars['String']['output'];
+  questionId: Scalars['ID']['output'];
+};
+
+export type AnswerInput = {
+  correct: Scalars['Boolean']['input'];
+  correctAnswer: Scalars['String']['input'];
+  myAnswer: Scalars['String']['input'];
+};
+
 export type AttachedText = {
   __typename?: 'AttachedText';
   id: Scalars['String']['output'];
@@ -453,6 +469,7 @@ export type Mutation = {
   gaiaMutations: GaiaMutations;
   galleryMutations: GalleryMutations;
   hadesMutations: HadesMutations;
+  questionMutations: QuestionMutations;
 };
 
 export type PageInfo = {
@@ -471,9 +488,21 @@ export type PagedAccounts = {
   pageInfo: PageInfo;
 };
 
+export type PagedAnswers = {
+  __typename?: 'PagedAnswers';
+  items: Array<Answer>;
+  pageInfo: PageInfo;
+};
+
 export type PagedBlogPosts = {
   __typename?: 'PagedBlogPosts';
   items: Array<BlogPost>;
+  pageInfo: PageInfo;
+};
+
+export type PagedQuestions = {
+  __typename?: 'PagedQuestions';
+  items: Array<Question>;
   pageInfo: PageInfo;
 };
 
@@ -498,6 +527,7 @@ export type Query = {
   gaiaQueries: GaiaQueries;
   galleryQueries: GalleryQueries;
   hadesQueries: HadesQueries;
+  questionQueries: QuestionQueries;
   stemPlayerQueries: StemPlayerQueries;
   wikiQueries: WikiQueries;
 };
@@ -508,6 +538,71 @@ export type QuerySuccess = {
   __typename?: 'QuerySuccess';
   id?: Maybe<Scalars['ID']['output']>;
   message: Scalars['String']['output'];
+};
+
+export type Question = {
+  __typename?: 'Question';
+  answer: Scalars['String']['output'];
+  createdAt: Scalars['DateTime']['output'];
+  explanation?: Maybe<Scalars['String']['output']>;
+  id: Scalars['ID']['output'];
+  remoteObject: Array<Scalars['String']['output']>;
+  stem: Scalars['String']['output'];
+};
+
+export type QuestionInput = {
+  answer: Scalars['String']['input'];
+  explanation?: InputMaybe<Scalars['String']['input']>;
+  remoteObject?: InputMaybe<Array<Scalars['String']['input']>>;
+  stem: Scalars['String']['input'];
+};
+
+export type QuestionMutations = {
+  __typename?: 'QuestionMutations';
+  bulkCreateQuestions?: Maybe<QueryResult>;
+  linkQuestion?: Maybe<QueryResult>;
+  submitAnswer?: Maybe<QueryResult>;
+};
+
+
+export type QuestionMutationsBulkCreateQuestionsArgs = {
+  inputs: Array<QuestionInput>;
+};
+
+
+export type QuestionMutationsLinkQuestionArgs = {
+  questionId: Scalars['ID']['input'];
+  target: Scalars['String']['input'];
+};
+
+
+export type QuestionMutationsSubmitAnswerArgs = {
+  input: AnswerInput;
+  questionId: Scalars['ID']['input'];
+};
+
+export type QuestionQueries = {
+  __typename?: 'QuestionQueries';
+  listAnswers: PagedAnswers;
+  listQuestions: PagedQuestions;
+  locateQuestion?: Maybe<Question>;
+};
+
+
+export type QuestionQueriesListAnswersArgs = {
+  pagination?: InputMaybe<PaginationInput>;
+  questionId: Scalars['ID']['input'];
+};
+
+
+export type QuestionQueriesListQuestionsArgs = {
+  pagination?: InputMaybe<PaginationInput>;
+  remoteObject?: InputMaybe<Scalars['String']['input']>;
+};
+
+
+export type QuestionQueriesLocateQuestionArgs = {
+  id: Scalars['ID']['input'];
 };
 
 export type ReaderText = {
@@ -614,10 +709,16 @@ export type Summary = {
 
 export type WikiQueries = {
   __typename?: 'WikiQueries';
+  wikipediaPage?: Maybe<Scalars['String']['output']>;
   wikipediaRelatedTopics: Array<RelatedTopic>;
   wikipediaSearch: Array<Summary>;
   wikipediaSummary?: Maybe<Summary>;
   wiktionaryEntry?: Maybe<Entry>;
+};
+
+
+export type WikiQueriesWikipediaPageArgs = {
+  title: Scalars['String']['input'];
 };
 
 
@@ -754,6 +855,42 @@ export type LocateReaderTextsQueryVariables = Exact<{
 
 export type LocateReaderTextsQuery = { __typename?: 'Query', hadesQueries: { __typename?: 'HadesQueries', locateReaderTexts: Array<{ __typename?: 'ReaderText', id: string, title: string, language: string, level: CefrLevel, status: ReaderTextStatus }> } };
 
+export type BulkCreateQuestionsMutationVariables = Exact<{
+  inputs: Array<QuestionInput> | QuestionInput;
+}>;
+
+
+export type BulkCreateQuestionsMutation = { __typename?: 'Mutation', questionMutations: { __typename?: 'QuestionMutations', bulkCreateQuestions?:
+      | { __typename?: 'QuerySuccess', message: string, id?: string | null }
+      | { __typename?: 'StandardError', message: string }
+     | null } };
+
+export type ListQuestionsQueryVariables = Exact<{
+  remoteObject?: InputMaybe<Scalars['String']['input']>;
+  pagination?: InputMaybe<PaginationInput>;
+}>;
+
+
+export type ListQuestionsQuery = { __typename?: 'Query', questionQueries: { __typename?: 'QuestionQueries', listQuestions: { __typename?: 'PagedQuestions', items: Array<{ __typename?: 'Question', id: string, stem: string, answer: string, explanation?: string | null, remoteObject: Array<string>, createdAt: any }>, pageInfo: { __typename?: 'PageInfo', page: number, size: number, totalPages: number, totalCount: number, hasNextPage: boolean, hasPreviousPage: boolean } } } };
+
+export type SubmitAnswerMutationVariables = Exact<{
+  questionId: Scalars['ID']['input'];
+  input: AnswerInput;
+}>;
+
+
+export type SubmitAnswerMutation = { __typename?: 'Mutation', questionMutations: { __typename?: 'QuestionMutations', submitAnswer?:
+      | { __typename?: 'QuerySuccess', message: string, id?: string | null }
+      | { __typename?: 'StandardError', message: string }
+     | null } };
+
+export type WikipediaPageQueryVariables = Exact<{
+  title: Scalars['String']['input'];
+}>;
+
+
+export type WikipediaPageQuery = { __typename?: 'Query', wikiQueries: { __typename?: 'WikiQueries', wikipediaPage?: string | null } };
+
 export type WikipediaRelatedTopicsQueryVariables = Exact<{
   title: Scalars['String']['input'];
 }>;
@@ -797,6 +934,10 @@ export const LoginDocument = {"kind":"Document","definitions":[{"kind":"Operatio
 export const MeDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"me"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"gaiaQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"me"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"username"}},{"kind":"Field","name":{"kind":"Name","value":"personId"}},{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}},{"kind":"Field","name":{"kind":"Name","value":"updatedAt"}}]}}]}}]}}]} as unknown as DocumentNode<MeQuery, MeQueryVariables>;
 export const HadesTextsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"hadesTexts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pagination"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"PaginationInput"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"hadesQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"texts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"pagination"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pagination"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"language"}},{"kind":"Field","name":{"kind":"Name","value":"level"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"page"}},{"kind":"Field","name":{"kind":"Name","value":"size"}},{"kind":"Field","name":{"kind":"Name","value":"totalPages"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"hasNextPage"}},{"kind":"Field","name":{"kind":"Name","value":"hasPreviousPage"}}]}}]}}]}}]}}]} as unknown as DocumentNode<HadesTextsQuery, HadesTextsQueryVariables>;
 export const LocateReaderTextsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"locateReaderTexts"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"ids"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"hadesQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"locateReaderTexts"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"ids"},"value":{"kind":"Variable","name":{"kind":"Name","value":"ids"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"language"}},{"kind":"Field","name":{"kind":"Name","value":"level"}},{"kind":"Field","name":{"kind":"Name","value":"status"}}]}}]}}]}}]} as unknown as DocumentNode<LocateReaderTextsQuery, LocateReaderTextsQueryVariables>;
+export const BulkCreateQuestionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"BulkCreateQuestions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"inputs"}},"type":{"kind":"NonNullType","type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"QuestionInput"}}}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"questionMutations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"bulkCreateQuestions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"inputs"},"value":{"kind":"Variable","name":{"kind":"Name","value":"inputs"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"QuerySuccess"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"message"}},{"kind":"Field","name":{"kind":"Name","value":"id"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"StandardError"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]}}]}}]} as unknown as DocumentNode<BulkCreateQuestionsMutation, BulkCreateQuestionsMutationVariables>;
+export const ListQuestionsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"ListQuestions"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"remoteObject"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"pagination"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"PaginationInput"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"questionQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"listQuestions"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"remoteObject"},"value":{"kind":"Variable","name":{"kind":"Name","value":"remoteObject"}}},{"kind":"Argument","name":{"kind":"Name","value":"pagination"},"value":{"kind":"Variable","name":{"kind":"Name","value":"pagination"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"items"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"stem"}},{"kind":"Field","name":{"kind":"Name","value":"answer"}},{"kind":"Field","name":{"kind":"Name","value":"explanation"}},{"kind":"Field","name":{"kind":"Name","value":"remoteObject"}},{"kind":"Field","name":{"kind":"Name","value":"createdAt"}}]}},{"kind":"Field","name":{"kind":"Name","value":"pageInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"page"}},{"kind":"Field","name":{"kind":"Name","value":"size"}},{"kind":"Field","name":{"kind":"Name","value":"totalPages"}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"hasNextPage"}},{"kind":"Field","name":{"kind":"Name","value":"hasPreviousPage"}}]}}]}}]}}]}}]} as unknown as DocumentNode<ListQuestionsQuery, ListQuestionsQueryVariables>;
+export const SubmitAnswerDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"SubmitAnswer"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"questionId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"AnswerInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"questionMutations"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"submitAnswer"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"questionId"},"value":{"kind":"Variable","name":{"kind":"Name","value":"questionId"}}},{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"QuerySuccess"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"message"}},{"kind":"Field","name":{"kind":"Name","value":"id"}}]}},{"kind":"InlineFragment","typeCondition":{"kind":"NamedType","name":{"kind":"Name","value":"StandardError"}},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"message"}}]}}]}}]}}]}}]} as unknown as DocumentNode<SubmitAnswerMutation, SubmitAnswerMutationVariables>;
+export const WikipediaPageDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"wikipediaPage"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikiQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikipediaPage"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}}]}]}}]}}]} as unknown as DocumentNode<WikipediaPageQuery, WikipediaPageQueryVariables>;
 export const WikipediaRelatedTopicsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"wikipediaRelatedTopics"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikiQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikipediaRelatedTopics"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"pageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"extract"}}]}}]}}]}}]} as unknown as DocumentNode<WikipediaRelatedTopicsQuery, WikipediaRelatedTopicsQueryVariables>;
 export const WikipediaSearchDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"wikipediaSearch"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"query"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikiQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikipediaSearch"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"query"},"value":{"kind":"Variable","name":{"kind":"Name","value":"query"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"extract"}},{"kind":"Field","name":{"kind":"Name","value":"pageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"thumbnailUrl"}}]}}]}}]}}]} as unknown as DocumentNode<WikipediaSearchQuery, WikipediaSearchQueryVariables>;
 export const WikipediaSummaryDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"wikipediaSummary"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"title"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikiQueries"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"wikipediaSummary"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"title"},"value":{"kind":"Variable","name":{"kind":"Name","value":"title"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"title"}},{"kind":"Field","name":{"kind":"Name","value":"extract"}},{"kind":"Field","name":{"kind":"Name","value":"pageUrl"}},{"kind":"Field","name":{"kind":"Name","value":"thumbnailUrl"}}]}}]}}]}}]} as unknown as DocumentNode<WikipediaSummaryQuery, WikipediaSummaryQueryVariables>;
