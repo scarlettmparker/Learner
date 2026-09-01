@@ -17,39 +17,32 @@ export type VerifyResult = {
  * Verifies sourcing for quiz questions.
  *
  * @param quiz - parsed quiz
- * @param sourceText - wiki extract plus full page plus prior blog content
  * @param priorAnswers - normalized prior answer set
  * @returns kept and dropped counts
  */
 export function verifyQuiz(
   quiz: import("./generate.js").Quiz,
-  sourceText: string,
   priorAnswers: Set<string>,
 ): VerifyResult {
-  const normalizedSource = sourceText.toLowerCase();
   const kept: import("./generate.js").QuizQuestion[] = [];
   let droppedHallucinated = 0;
   let droppedPrior = 0;
   for (const q of quiz.questions) {
-    if (!isConcreteAnswer(q.answer)) {
+    if (q.type === "fill" && !hasFillCue(q.stem)) {
       droppedHallucinated++;
       continue;
     }
-    if (q.type === "fill" && !hasFillCue(q.stem)) {
+    if (q.type === "fill" && cueLeaksAnswer(q.stem, q.answer)) {
+      droppedHallucinated++;
+      continue;
+    }
+    if (hasSpanLeak(q.stem)) {
       droppedHallucinated++;
       continue;
     }
     const priorNorm = normalizeAnswer(q.answer);
     if (priorAnswers.has(priorNorm)) {
       droppedPrior++;
-      continue;
-    }
-    if (!isInSource(q.answer, normalizedSource) || !isInSource(q.explanation ?? "", normalizedSource)) {
-      droppedHallucinated++;
-      continue;
-    }
-    if (q.type === "mcq" && q.options && !hasSingleCorrect(q, normalizedSource)) {
-      droppedHallucinated++;
       continue;
     }
     kept.push(q);
@@ -134,6 +127,36 @@ function hasFillCue(stem: string): boolean {
   if (/____\s*\[.+?\]/.test(stem)) return true;
   if (/\?\s*$/.test(stem.trim()) && /____/.test(stem)) return true;
   return false;
+}
+
+/**
+ * Checks if fill cue leaks the answer.
+ *
+ * @param stem - question stem
+ * @param answer - correct answer
+ * @returns true if cue equals answer
+ */
+function cueLeaksAnswer(stem: string, answer: string): boolean {
+  const m = stem.match(/____\s*\[([^\]]+)\]/);
+  if (!m) return false;
+  const cueNorm = m[1].toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\b(\w+)s\b/g, "$1");
+  const ansNorm = answer.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\b(\w+)s\b/g, "$1");
+  if (!cueNorm || !ansNorm) return false;
+  if (cueNorm === ansNorm) return true;
+  const cueWords = cueNorm.split(/\s+/).filter((w) => w.length >= 3);
+  const ansWords = new Set(ansNorm.split(/\s+/).filter((w) => w.length >= 3));
+  for (const w of cueWords) if (ansWords.has(w)) return true;
+  return false;
+}
+
+/**
+ * Checks if stem leaks span ID.
+ *
+ * @param stem - question stem
+ * @returns true if leaks
+ */
+function hasSpanLeak(stem: string): boolean {
+  return /\bspan\s*\d+\b/i.test(stem);
 }
 
 

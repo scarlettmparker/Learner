@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { areExplanationsOverlapping, isFillCorrect } from "@sun/utils/nlp";
 import { callLLM, type ChatMessage } from "../llm/client.js";
 import { loadConfig } from "../config.js";
@@ -80,16 +82,49 @@ export type GenerateArgs = {
 };
 
 /**
+ * Loads all skill markdowns programmatically.
+ *
+ * @returns concatenated skills block
+ */
+function loadSkillsBlock(): string {
+  try {
+    const skillsDir = path.join(process.cwd(), ".opencode/skills");
+    if (!fs.existsSync(skillsDir)) return "(no skills found)";
+    const entries = fs.readdirSync(skillsDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+      .sort();
+    const blocks: string[] = [];
+    for (const name of entries) {
+      const p = path.join(skillsDir, name, "SKILL.md");
+      if (fs.existsSync(p)) {
+        const text = fs.readFileSync(p, "utf-8").trim();
+        blocks.push(`## Skill: ${name}\n${text}`);
+      }
+    }
+    if (blocks.length === 0) return "(no skills found)";
+    return blocks.join("\n\n---\n\n");
+  } catch {
+    return "(skills load failed)";
+  }
+}
+
+/**
  * Builds system prompt for IR markdown.
  *
  * @returns system message
  */
 function buildSystemPrompt(): ChatMessage {
+  const skillsBlock = loadSkillsBlock();
   return {
     role: "system",
     content: `You are Sun Learn's quiz generator. Create an interactive quiz from the Wikipedia extract and blog context below. Spend minimal thinking, give results directly.
 
-STEP 0 - Load check: You MUST read every skill in .opencode/skills/* and apply them together: fill-blank-clarity, quiz-dedup-guard, quiz-balance, quiz-markdown-writer, mastery-assessor, wiki-context-fetcher, knowledge-parent-picker, plus anti-ai-slop-writing references/banned-words.md. Do not skip one. Checklist: list the 7 skills plus banned-words.md you loaded. Then obey them strictly. Do not use em dashes at all. Use commas, colons, or periods instead. If you use an em dash you have failed.
+The following skills are programmatically injected and already loaded for you. Apply them together strictly, do not ask to read files.
+
+${skillsBlock}
+
+Do not use em dashes at all. Use commas, colons, or periods instead. If you use an em dash you have failed.
 
 Rules:
 - Source: every Answer and Explain must be a verbatim substring of Wiki extract, Full page excerpt, or Prior blog content. If it is not in that source, do not invent it. Code will drop hallucinations.
@@ -113,16 +148,18 @@ Answer: concise phrase
 Explain: wiki span
 
 - Each mcq: 4 distinct full phrases, only one correct per source, randomize correct position across A to D, distractors from source key concepts and same type as answer, deduplicate stem/options (no option repeats stem substring >5 chars), never placeholders like A/B/C/D or Not ...1. Re-read the stem to ensure only the intended option is correct.
-- You MUST generate the exact number requested (5 for basic/easy, 10 for default/normal, 15-20 for advanced hard floor 15 target 20 accept >=15). Count Q1..Qn aloud and do not stop early. Aim to overshoot by 2 so dedup still leaves the target: if 10 is requested, draft 12 distinct questions; if 20 is requested, draft 20. If you run short, pull from different sections, dates, and formulations directly tied to the Topic.
-- Keep stems and options close to the source; explanations must quote a short source span only (no PageUrl, source is at top).
+ - You MUST generate the exact number requested (5 for basic/easy, 10 for default/normal, 15-20 for advanced hard floor 15 target 20 accept >=15). Count Q1..Qn aloud and do not stop early. Aim to overshoot by 2 so dedup still leaves the target: if 10 is requested, draft 12 distinct questions; if 20 is requested, draft 20. If you run short, pull from different sections, dates, and formulations directly tied to the Topic. Before you close, count your Q headers; if fewer than N, keep generating until you reach N. Stopping at 4 when 10 were requested is a failure.
+ - Keep stems and options close to the source; explanations must quote a short source span only (no PageUrl, source is at top).
+ - Make the quiz feel interactive, not excerpt-fitting: test understanding the learner can use, not just verbatim recall of one sentence. Prefer rephrased stems that ask the learner to explain or apply the idea.
 - When difficulty advanced/mastery true, use synthesis across sections not just definitions. You must get harder as prior attempts show mastery -add synthesis, application, comparison, dating, relation questions. If you stay on definitions the learner stalls.
-- Fill blanks must always have a cue after the blank like ____ [year] or ____ [concept] or be phrased as a direct question such as "In what year was the treaty signed?" Never leave a bare ____ without a cue. Every fill must include a cue like [year], [person], [work], [place], [term], [concept], [noun] right after ____. The article before ____ must agree with the answer: write an ____ [concept] for vowel sounds, a ____ [concept] for consonant sounds, or omit the article. Test by inserting the answer: "also an end" is correct, "also a end" is not. Every fill must be grammatically correct as an intentional fragment. Read the stem with the answer inserted; it must sound right. Don't write "would ____ [activity]" and expect a gerund like "undermining the process" 0 that reads "would undermining" and is wrong. Write "would ____ [verb]" for the base form or "would result in ____ [noun phrase]" for the gerund.
+ - Fill blanks must always have a cue after the blank like ____ [year] or ____ [concept] or be phrased as a direct question such as "In what year was the treaty signed?" Never leave a bare ____ without a cue. Every fill must include a cue like [year], [person], [work], [place], [term], [concept], [noun] right after ____. The cue must be a TYPE hint, never the answer word itself. Writing "right ____ [prior]" when the answer is "prior" is a leak and will be dropped. Cue [year] is correct, cue [prior] when answer is prior is wrong. The article before ____ must agree with the answer: write an ____ [concept] for vowel sounds, a ____ [concept] for consonant sounds, or omit the article. Test by inserting the answer: "also an end" is correct, "also a end" is not. Every fill must be grammatically correct as an intentional fragment. Read the stem with the answer inserted; it must sound right. Don't write "would ____ [activity]" and expect a gerund like "undermining the process" 0 that reads "would undermining" and is wrong. Write "would ____ [verb]" for the base form or "would result in ____ [noun phrase]" for the gerund.
 - Don't carve two fills out of one sentence. A common failure is blanking two words from the same source sentence 0 both Explains quote that one sentence and only the blank moves. That's a repeat, even though the blank word differs. If you use a sentence for one Explain, pick a different sentence or a different paragraph for the next. Explain spans shouldn't share more than a handful of words; stems shouldn't be the same sentence with a different word blanked.
 - Every question must test a different fact and a different span: no two share the same normalized answer (lowercase, strip punctuation, singularise) or the same quoted span. Answers across the quiz must be distinct after lowercasing and singularising. Do not repeat any fact already in Prior blog context where Result shows correct.
 - Founder or origin questions (e.g., who introduced a concept) allowed at most once per quiz, and only if not already stated in prior stems; don't leak later answers in earlier stems or options.
 - Answer lines must be bare phrase only, never "A. phrase" or "B. phrase" - the program shuffles and checks the phrase itself, a prefix breaks grading.
 - Never include the answer in the stem. The stem, and any list inside it, must not contain the answer as a whole word or phrase, case-insensitive, singular and plural, and split hyphenated compounds. Strip the blank ____ and hints like [year] or [term] before checking. If the answer has multiple words, the stem must not contain that exact phrase and must not contain any content word from the answer. If a sentence already states the answer, rephrase the stem to remove it or pick a different sentence. Code will drop leaked questions and force regeneration, so you will lose count if you leak.
-- Follow anti-ai-slop: avoid banned words (delve, tapestry, vibrant, pivotal, crucial, intricate, meticulous, comprehensive, foster, leverage, utilize, seamless, robust, groundbreaking, transformative), mix sentence lengths, no rule-of-three, active voice, no em dashes at all.
+ - Follow anti-ai-slop: avoid banned words (delve, tapestry, vibrant, pivotal, crucial, intricate, meticulous, comprehensive, foster, leverage, utilize, seamless, robust, groundbreaking, transformative), mix sentence lengths, no rule-of-three, active voice, no em dashes at all.
+ - Never reference Source Span numbers or IDs in the stem. Do not write "According to Span 6", "Span 3 says", "See Span 6" or any "Span X". If you need attribution, say "According to the extract" or "According to the excerpt" or just ask directly. Any question mentioning "Span" will be dropped and you will lose count.
 
 STAY ON TOPIC: All stems, answers, and Explains must be directly answerable from the Wiki extract, Full page excerpt, and Prior blog content for the Topic and Wiki title above. Do not stray to generic biography, broad movements, or other background unless that text is inside that source and directly illustrates the Topic. Related topics are hints only, filter to those whose source mentions the Topic. If you stray, you have failed. If source does not contain it, do not say it.
 
@@ -139,7 +176,7 @@ When full page excerpt is provided, ask detailed questions from the full page sc
  */
 function buildUserPrompt(args: GenerateArgs, spansBlock: string): ChatMessage {
   const pagePart = args.fullPage
-    ? `Full page excerpt (chunked, spans entire page):\n${args.fullPage}\n`
+    ? `Full page excerpt (raw, entire page):\n${args.fullPage}\n`
     : "";
   const difficulty = args.difficulty ?? (args.mastery ? "advanced" : "default");
   const isAdvanced = difficulty === "advanced";
@@ -159,7 +196,9 @@ Prior KNOWLEDGE titles: ${args.priorContext || "(none)"}
 Related topics: ${args.related.map((r) => r.title).join(", ") || "(none)"}
 Difficulty: ${difficulty}
 Focus: Every question must be directly about "${args.topic}" / "${args.summary.title}" and use a distinct Source Span or subphrase above. Do not invent outside that source. Do not repeat any Q already in Prior blog Q and A where correct.
-Generate exactly ${args.numQuestions} questions, overshoot to ${overshoot} distinct questions so distinct spans still leave ${args.numQuestions}. Count Q1 to Q${overshoot} aloud and do not stop early. You must deliver exactly ${args.numQuestions}, subphrases allowed to hit N without reuse.${isAdvanced ? " Mix: 50% short, 25% mcq, 25% fill" : " Mix: ~33% mcq, ~33% fill, ~33% short"}, interleaved (mcq, fill, short, repeat, never 3 of same type in a row).${isAdvanced ? " For advanced, at least half must be synthesis and application: give a new scenario and ask what the principle would say, compare formulations, ask why a maxim fails. Don't stay on simple recall. Never put the answer in parentheses inside an mcq option, and all 4 mcq options must be same type as the answer (all years if answer is a year) and only one correct." : " For default/basic, keep the mix but really push to the overshoot; use synthesis and dating too where possible, just lighter and still on Topic."} Return markdown only. Answer must be bare phrase, never prefixed with "A. " or "B. " - just the phrase. Check each Answer and Explain is in the source spans.`,
+Generate exactly ${args.numQuestions} questions, overshoot to ${overshoot} distinct questions so distinct spans still leave ${args.numQuestions}. Count Q1 to Q${overshoot} aloud and do not stop early. You must deliver exactly ${args.numQuestions}, subphrases allowed to hit N without reuse.${isAdvanced ? " Mix: 50% short, 25% mcq, 25% fill" : " Mix: ~33% mcq, ~33% fill, ~33% short"}, interleaved (mcq, fill, short, repeat, never 3 of same type in a row).${isAdvanced ? " For advanced, at least half must be synthesis and application: give a new scenario and ask what the principle would say, compare formulations, ask why a maxim fails. Don't stay on simple recall. Never put the answer in parentheses inside an mcq option, and all 4 mcq options must be same type as the answer (all years if answer is a year) and only one correct." : " For default/basic, keep the mix but really push to the overshoot; use synthesis and dating too where possible, just lighter and still on Topic."} Return markdown only. Answer must be bare phrase, never prefixed with "A. " or "B. " - just the phrase. Check each Answer and Explain is in the source spans.
+
+Before you finish, count your Q headers. You need Q1 through Q${overshoot} (at least ${args.numQuestions}). If you have fewer, keep generating distinct questions from remaining Source Spans until you reach ${overshoot}. Do not output fewer than ${args.numQuestions} under any circumstance.`,
   };
 }
 
@@ -273,6 +312,17 @@ function sanitizeOptions(options: string[], answer: string): string[] {
  * @returns true if stem leaks answer
  */
 function stemContainsAnswer(stem: string, answer: string): boolean {
+  const cueMatch = stem.match(/____\s*\[([^\]]+)\]/);
+  if (cueMatch) {
+    const cueNorm = cueMatch[1].toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\b(\w+)s\b/g, "$1");
+    const ansNormEarly = answer.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\b(\w+)s\b/g, "$1");
+    if (cueNorm && ansNormEarly) {
+      if (cueNorm === ansNormEarly) return true;
+      const cueWords = cueNorm.split(/\s+/).filter((w) => w.length >= 3);
+      const ansWordsEarly = new Set(ansNormEarly.split(/\s+/).filter((w) => w.length >= 3));
+      for (const w of cueWords) if (ansWordsEarly.has(w)) return true;
+    }
+  }
   const cleanStem = stem
     .replace(/_{2,}/g, " ")
     .replace(/\s*\[.*?\]/g, " ")
@@ -359,14 +409,12 @@ export async function generateQuiz(props: GenerateArgs): Promise<Quiz> {
   const user = buildUserPrompt(args, spansBlock);
   const config = loadConfig();
   const overshoot = Math.ceil(args.numQuestions * 1.2) + 2;
-  const neededTokens = Math.max(
-    config.maxOutputTokens ?? 12288,
-    overshoot * 550,
-  );
+  const neededTokens = Math.max(4096, overshoot * 600);
+  const maxOutputTokens = neededTokens;
   let text = await callLLM([system, user], {
     effort: config.reasoningEffort,
     verbosity: config.verbosity,
-    maxOutputTokens: neededTokens,
+    maxOutputTokens,
   });
   let parsed = parseMarkdownToQuiz(text, { ...args, numQuestions: overshoot });
   if (!parsed)
@@ -381,7 +429,7 @@ export async function generateQuiz(props: GenerateArgs): Promise<Quiz> {
         .trim(),
     ),
   );
-  const verified = verifyQuiz(parsed, sourceText, priorSet);
+  let verified = verifyQuiz(parsed, priorSet);
   let deduped = dedupQuiz({ questions: verified.kept });
   let dropped = verified.droppedHallucinated + verified.droppedPrior;
   const floor = args.difficulty === "advanced" ? 15 : args.numQuestions;
@@ -392,8 +440,11 @@ export async function generateQuiz(props: GenerateArgs): Promise<Quiz> {
     attempts < 3
   ) {
     const need = args.numQuestions - deduped.questions.length;
-    if (need <= 0 && deduped.questions.length >= floor) break;
-    const remaining = need > 0 ? need : floor - deduped.questions.length;
+    const remaining =
+      need > 0
+        ? need
+        : floor - deduped.questions.length;
+    if (remaining <= 0) break;
     const existingStems = deduped.questions.map((q) => q.stem).join("\n");
     const existingAnswers = deduped.questions.map((q) => q.answer).join(", ");
     const remainingSpans = spans
@@ -417,19 +468,19 @@ ${remainingSpans || spansBlock}
 Existing stems:
 ${existingStems}
 Existing answers: ${existingAnswers}
-Same format Q${deduped.questions.length + 1}.., same difficulty ${args.difficulty}, same mix. Return markdown only. You must deliver exactly ${remaining} more so total is ${args.numQuestions}.`,
+Same format Q${deduped.questions.length + 1}.., same difficulty ${args.difficulty}, same mix. Return markdown only. You must deliver exactly ${remaining} more so total is ${args.numQuestions}. Before you finish, count your Q headers to confirm you hit ${remaining}.`,
     };
     const extraText = await callLLM([system, supplementUser], {
       effort: config.reasoningEffort,
       verbosity: config.verbosity,
-      maxOutputTokens: Math.max(2048, remaining * 550),
+      maxOutputTokens: Math.max(4096, remaining * 600),
     });
     const extraParsed = parseMarkdownToQuiz(extraText, {
       ...args,
       numQuestions: remaining,
     });
     if (!extraParsed) break;
-    const extraVerified = verifyQuiz(extraParsed, sourceText, priorSet);
+    const extraVerified = verifyQuiz(extraParsed, priorSet);
     dropped = extraVerified.droppedHallucinated + extraVerified.droppedPrior;
     const merged: Quiz = {
       questions: [...deduped.questions, ...extraVerified.kept],
@@ -437,7 +488,6 @@ Same format Q${deduped.questions.length + 1}.., same difficulty ${args.difficult
     deduped = dedupQuiz(merged);
     attempts++;
   }
-
   const shuffled = shuffleAndInterleave(deduped);
   return { questions: shuffled.questions.slice(0, args.numQuestions) };
 }
@@ -552,11 +602,11 @@ export async function gradeAnswer(
   const system: ChatMessage = {
     role: "system",
     content:
-      "You judge short answers. Read anti-ai-slop-writing references/banned-words.md and be lenient. Return JSON {correct: boolean} only. Accept paraphrase if core idea matches, ignore articles, hedging, order, or synonyms. Mark correct when learner captures the main idea even if wording differs. Spend minimal thinking, no chain-of-thought.",
+      "You judge short answers for a learner. Be lenient but accurate. Return JSON {\"correct\": boolean} only, no prose. Mark correct if the learner captures the central idea with the key distinguishing term, even if wording differs. Ignore hedging or prefix like 'Because', 'Since', 'It is because'. Ignore articles, case, punctuation, word order, extra filler. Treat intensifiers as optional: 'very important' == 'important', 'too heavily' == 'heavily'. Treat close synonyms as equivalent. Only mark correct if the core noun or verb from the correct answer is present in some form; vague generic paraphrases that omit the key term are wrong. Lean toward wrong if the key term is missing. Examples:\nCorrect: \"requires very careful planning\" | My: \"Because it requires careful planning\" - {\"correct\": true}\nCorrect: \"located in central Europe\" | My: \"it is in central Europe\" - {\"correct\": true}\nCorrect: \"photosynthesis needs sunlight\" | My: \"it depends on sunlight\" - {\"correct\": true}\nCorrect: \"treaty was signed in 1919\" | My: \"it was signed in Versailles\" - {\"correct\": false}\nCorrect: \"cannot decide through empirical means\" | My: \"its outcome\" - {\"correct\": false}\nSpend minimal thinking, no chain-of-thought.",
   };
   const user: ChatMessage = {
     role: "user",
-    content: `Question: ${question.stem}\nCorrect: ${question.answer}\nMy: ${myAnswer}\nJudge leniently:`,
+    content: `Question: ${question.stem}\nCorrect: ${question.answer}\nExplain: ${question.explanation ?? ""}\nMy: ${myAnswer}\nJudge leniently, return JSON only:`,
   };
   try {
     const config = loadConfig();
@@ -565,8 +615,12 @@ export async function gradeAnswer(
       verbosity: config.fastVerbosity,
       maxOutputTokens: config.gradeMaxTokens,
     });
-    const parsed = JSON.parse(text) as { correct?: boolean };
-    if (typeof parsed.correct === "boolean") return { correct: parsed.correct };
+    try {
+      const parsed = JSON.parse(text) as { correct?: boolean };
+      if (typeof parsed.correct === "boolean") return { correct: parsed.correct };
+    } catch {}
+    const m = text.match(/"correct"\s*:\s*(true|false)/i);
+    if (m) return { correct: m[1].toLowerCase() === "true" };
   } catch {}
   return { correct: false };
 }

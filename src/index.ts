@@ -25,7 +25,6 @@ import {
   pickParentInteractive,
   updateBlog,
 } from "./sun.js";
-import { chunkPage, sampleChunksForQuiz } from "./quiz/chunk.js";
 import { withThinking } from "./ui/thinking.js";
 import { generateQuiz } from "./quiz/generate.js";
 import { buildMarkdown } from "./quiz/markdown.js";
@@ -521,10 +520,6 @@ async function runLearnSession(
   const fullPageEnriched = [wiki.fullPage, relatedEnrichment]
     .filter(Boolean)
     .join("\n\n");
-  const chunks = fullPageEnriched ? chunkPage(fullPageEnriched) : [];
-  const sampledForQuiz = chunks.length
-    ? sampleChunksForQuiz(chunks, blogCtx.priorContext, 3)
-    : fullPageEnriched;
   let readinessReady = false;
   if (blogCtx.existingForContext) {
     const { assessReadiness } = await import("./quiz/revisit.js");
@@ -572,7 +567,7 @@ async function runLearnSession(
         priorAnswersMarkdown,
         priorAnswerSet,
         numQuestions,
-        fullPage: sampledForQuiz || wiki.fullPage,
+        fullPage: fullPageEnriched || wiki.fullPage,
         difficulty,
         mastery: readinessReady,
       }),
