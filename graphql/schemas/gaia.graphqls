@@ -56,19 +56,73 @@ type AuthResult {
   personId: ID!
 }
 
+type LogoutResponse {
+  message: String!
+}
+
+type SuspendAccountResponse {
+  message: String!
+  account: Account!
+}
+
+type UnsuspendAccountResponse {
+  message: String!
+  account: Account!
+}
+
+type CreateRoleResponse {
+  message: String!
+  role: Role!
+}
+
+type DeleteRoleResponse {
+  message: String!
+  id: ID!
+}
+
+type SetAccountRolesResponse {
+  message: String!
+  accountId: ID!
+  roles: [String!]!
+}
+
+type SetAccountPermissionsResponse {
+  message: String!
+  accountId: ID!
+  permissions: [String!]!
+}
+
+type SetRolePermissionsResponse {
+  message: String!
+  roleId: ID!
+  permissions: [String!]!
+}
+
+type DeactivateAccountResponse {
+  message: String!
+}
+
+type RequestAccountReactivationResponse {
+  message: String!
+}
+
+type ConfirmAccountReactivationResponse {
+  message: String!
+}
+
 type GaiaMutations {
   login(input: LoginInput!): AuthResult
-  logout: QueryResult
-  suspendAccount(id: ID!): QueryResult
-  unsuspendAccount(id: ID!): QueryResult
-  createRole(name: String!, description: String): Role
-  deleteRole(id: ID!): QueryResult
-  setAccountRoles(accountId: ID!, roleNames: [String!]!): QueryResult
-  setAccountPermissions(accountId: ID!, permissions: [String!]!): QueryResult
-  setRolePermissions(roleId: ID!, permissions: [String!]!): QueryResult
-  deactivateAccount: QueryResult
-  requestAccountReactivation(email: String!, provider: String!): QueryResult
-  confirmAccountReactivation(token: String!): QueryResult
+  logout: LogoutResponse!
+  suspendAccount(id: ID!): SuspendAccountResponse!
+  unsuspendAccount(id: ID!): UnsuspendAccountResponse!
+  createRole(name: String!, description: String): CreateRoleResponse!
+  deleteRole(id: ID!): DeleteRoleResponse!
+  setAccountRoles(accountId: ID!, roleNames: [String!]!): SetAccountRolesResponse!
+  setAccountPermissions(accountId: ID!, permissions: [String!]!): SetAccountPermissionsResponse!
+  setRolePermissions(roleId: ID!, permissions: [String!]!): SetRolePermissionsResponse!
+  deactivateAccount: DeactivateAccountResponse!
+  requestAccountReactivation(email: String!, provider: String!): RequestAccountReactivationResponse!
+  confirmAccountReactivation(token: String!): ConfirmAccountReactivationResponse!
 }
 
 extend type Query {

@@ -1,14 +1,3 @@
-type StandardError {
-  message: String!
-}
-
-type QuerySuccess {
-  message: String!
-  id: ID
-}
-
-union QueryResult = QuerySuccess | StandardError
-
 input PaginationInput {
   page: Int
   size: Int

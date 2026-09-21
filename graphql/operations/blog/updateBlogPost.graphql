@@ -1,13 +1,21 @@
 mutation updateBlogPost($id: ID!, $input: BlogPostInput!) {
   blogMutations {
     updateBlogPost(id: $id, input: $input) {
-      __typename
-      ... on QuerySuccess {
-        message
+      message
+      post {
         id
-      }
-      ... on StandardError {
-        message
+        title
+        content
+        tags
+        remoteObject
+        language
+        parentId
+        type {
+          id
+          name
+        }
+        createdAt
+        updatedAt
       }
     }
   }

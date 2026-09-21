@@ -41,8 +41,13 @@ type GaiaQueries {
   hubRegistry: HubRegistry
 }
 
+type SaveRegistryResponse {
+  message: String!
+  registry: HubRegistry!
+}
+
 type GaiaMutations {
-  saveRegistry(input: HubRegistryInput!): HubRegistry
+  saveRegistry(input: HubRegistryInput!): SaveRegistryResponse!
 }
 
 extend type Query {

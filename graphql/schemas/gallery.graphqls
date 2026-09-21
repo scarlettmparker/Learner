@@ -5,6 +5,7 @@ type GalleryItem {
   content: String
   imagePath: String
   remoteObject: [String!]
+  keyDetailId: ID
   createdAt: DateTime
   updatedAt: DateTime
 }
@@ -15,16 +16,23 @@ input GalleryItemInput {
   content: String
   imagePath: String
   remoteObject: [String!]
+  keyDetailId: ID
 }
 
 type GalleryQueries {
   list: [GalleryItem]
   locate(id: ID!): GalleryItem
   listByRemoteObjects(ids: [String!]!): [GalleryItem]
+  locateGalleryItems(ids: [ID!]!): [GalleryItem]
+}
+
+type CreateGalleryItemResponse {
+  message: String!
+  item: GalleryItem!
 }
 
 type GalleryMutations {
-  create(input: GalleryItemInput): QueryResult
+  create(input: GalleryItemInput): CreateGalleryItemResponse!
 }
 
 extend type Query {

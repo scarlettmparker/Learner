@@ -204,12 +204,10 @@ export async function createChildBlog(
     },
     token,
   );
-  if (!result || result.__typename !== "QuerySuccess" || !result.id) {
-    throw new Error(
-      (result as { message?: string })?.message ?? "Failed to create blog post",
-    );
+  if (!result?.post?.id) {
+    throw new Error(result?.message ?? "Failed to create blog post");
   }
-  return result.id;
+  return result.post.id;
 }
 
 /**
@@ -251,12 +249,10 @@ export async function updateBlog(
     { id, input: { content: newContent } },
     token,
   );
-  if (!result || result.__typename !== "QuerySuccess" || !result.id) {
-    throw new Error(
-      (result as { message?: string })?.message ?? "Failed to update blog post",
-    );
+  if (!result?.post?.id) {
+    throw new Error(result?.message ?? "Failed to update blog post");
   }
-  return result.id;
+  return result.post.id;
 }
 
 /**

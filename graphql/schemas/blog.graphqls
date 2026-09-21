@@ -91,13 +91,43 @@ input IngestBlogInput {
   parentId: ID
 }
 
+type CreateBlogPostResponse {
+  message: String!
+  post: BlogPost!
+}
+
+type UpdateBlogPostResponse {
+  message: String!
+  post: BlogPost!
+}
+
+type CreateBlogPostTypeResponse {
+  message: String!
+  type: BlogPostType!
+}
+
+type AddRemoteObjectResponse {
+  message: String!
+  post: BlogPost!
+}
+
+type RemoveRemoteObjectResponse {
+  message: String!
+  post: BlogPost!
+}
+
+type IngestBlogFromSourceResponse {
+  message: String!
+  post: BlogPost!
+}
+
 type BlogMutations {
-  createBlogPost(title: String!, input: BlogPostInput): QueryResult
-  updateBlogPost(id: ID!, input: BlogPostInput!): QueryResult
-  createBlogPostType(name: String!, description: String): QueryResult
-  addRemoteObject(postId: ID!, target: String!): QueryResult
-  removeRemoteObject(postId: ID!, target: String!): QueryResult
-  ingestBlogFromSource(input: IngestBlogInput!): QueryResult
+  createBlogPost(title: String!, input: BlogPostInput): CreateBlogPostResponse!
+  updateBlogPost(id: ID!, input: BlogPostInput!): UpdateBlogPostResponse!
+  createBlogPostType(name: String!, description: String): CreateBlogPostTypeResponse!
+  addRemoteObject(postId: ID!, target: String!): AddRemoteObjectResponse!
+  removeRemoteObject(postId: ID!, target: String!): RemoveRemoteObjectResponse!
+  ingestBlogFromSource(input: IngestBlogInput!): IngestBlogFromSourceResponse!
 }
 
 extend type Query {

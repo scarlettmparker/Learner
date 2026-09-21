@@ -1,12 +1,14 @@
 mutation BulkCreateQuestions($inputs: [QuestionInput!]!) {
   questionMutations {
     bulkCreateQuestions(inputs: $inputs) {
-      ... on QuerySuccess {
-        message
+      message
+      questions {
         id
-      }
-      ... on StandardError {
-        message
+        stem
+        answer
+        explanation
+        remoteObject
+        createdAt
       }
     }
   }

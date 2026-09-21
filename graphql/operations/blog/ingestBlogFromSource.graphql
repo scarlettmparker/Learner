@@ -1,14 +1,19 @@
 mutation ingestBlogFromSource($input: IngestBlogInput!) {
   blogMutations {
     ingestBlogFromSource(input: $input) {
-      ... on QuerySuccess {
-        __typename
-        message
+      message
+      post {
         id
-      }
-      ... on StandardError {
-        __typename
-        message
+        title
+        content
+        language
+        parentId
+        type {
+          id
+          name
+        }
+        createdAt
+        updatedAt
       }
     }
   }

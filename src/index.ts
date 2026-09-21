@@ -34,7 +34,7 @@ import { buildMarkdown } from "./quiz/markdown.js";
 import { runQuiz } from "./quiz/run.js";
 import { promptInput } from "./quiz/prompt.js";
 import { extractPriorQA } from "./quiz/blog-extract.js";
-import { bulkCreateQuestions, listQuestions, submitAnswer } from "./jocasta.js";
+import { bulkCreateQuestions, submitAnswer } from "./jocasta.js";
 
 type LearnOptions = {
   /**
@@ -616,13 +616,7 @@ async function runLearnSession(
     }));
     try {
       const bulk = await bulkCreateQuestions(inputs, token);
-      // Bulk returns single id on QuerySuccess; fetch created questions via remoteObject to get ids.
-      const created = await listQuestions(
-        studyRemote,
-        { size: inputs.length },
-        token,
-      ).catch(() => null);
-      const questions = created?.items ?? [];
+      const questions = bulk.questions;
       for (let i = 0; i < questions.length && i < answers.length; i++) {
         const q = questions[i];
         const a = answers.find((ans) => ans.question === q.stem);
@@ -637,20 +631,7 @@ async function runLearnSession(
           token,
         ).catch(() => {});
       }
-      if (
-        bulk &&
-        (bulk as { __typename?: string }).__typename === "StandardError"
-      ) {
-        console.log(
-          chalk.yellow(
-            `Jocasta bulk create warning: ${(bulk as { message?: string }).message}`,
-          ),
-        );
-      } else {
-        console.log(
-          chalk.dim(`Persisted ${inputs.length} questions to Jocasta`),
-        );
-      }
+      console.log(chalk.dim(`Persisted ${inputs.length} questions to Jocasta`));
     } catch (e) {
       console.log(
         chalk.yellow(`Jocasta persist skipped: ${(e as Error).message}`),
